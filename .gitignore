@@ -1,6 +1,0 @@
-﻿node_modules/
-dist/
-.vscode/
-.vercel/
-*.log
-.env
