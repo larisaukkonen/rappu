@@ -1,31 +1,24 @@
 // api/serve-ruutu.ts
-export const config = { runtime: "edge" };
-
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { list } from "@vercel/blob";
 
 /**
- * Usage via vercel.json rewrite:
+ * Access via rewrite:
  *   /ruutu/<file>  →  /api/serve-ruutu?key=ruutu/<file>
  */
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const url = new URL(req.url);
-    const key = url.searchParams.get("key");
-    if (!key) {
-      return new Response("Missing ?key=ruutu/<file>", { status: 400 });
-    }
+    const key = (req.query.key as string) || "";
+    if (!key) return res.status(400).send("Missing ?key=ruutu/<file>");
 
-    // Try exact match first
-    const exact = await list({ prefix: key, limit: 1 });
-    const entry = exact.blobs.find(b => b.pathname === key) ?? exact.blobs[0];
+    // find exact blob (or first under the prefix)
+    const { blobs } = await list({ prefix: key, limit: 1 });
+    const entry = blobs.find(b => b.pathname === key) ?? blobs[0];
+    if (!entry) return res.status(404).send("Not Found");
 
-    if (!entry) {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    // Permanent redirect to the Blob's public URL
-    return Response.redirect(entry.url, 302);
+    res.setHeader("Cache-Control", "public, max-age=60");
+    return res.redirect(302, entry.url);
   } catch (err: any) {
-    return new Response(`Error: ${err?.message || String(err)}`, { status: 500 });
+    return res.status(500).send(`Error: ${err?.message || String(err)}`);
   }
 }
