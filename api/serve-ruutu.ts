@@ -1,19 +1,18 @@
 // api/serve-ruutu.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { list } from "@vercel/blob";
 
 /**
  * Access via rewrite:
- *   /ruutu/<file>  →  /api/serve-ruutu?key=ruutu/<file>
+ *   /ruutu/<file> → /api/serve-ruutu?key=ruutu/<file>
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   try {
-    const key = (req.query.key as string) || "";
+    const key = (req.query?.key as string) || "";
     if (!key) return res.status(400).send("Missing ?key=ruutu/<file>");
 
-    // find exact blob (or first under the prefix)
+    // Exact match or first under the prefix
     const { blobs } = await list({ prefix: key, limit: 1 });
-    const entry = blobs.find(b => b.pathname === key) ?? blobs[0];
+    const entry = blobs.find((b) => b.pathname === key) ?? blobs[0];
     if (!entry) return res.status(404).send("Not Found");
 
     res.setHeader("Cache-Control", "public, max-age=60");
