@@ -1,8 +1,6 @@
+
 {
   "rewrites": [
-    { "source": "/ruutu/(.*)", "destination": "/api/serve-ruutu?file=$1" }
-  ],
-  "functions": {
-    "api/**/*.ts": { "runtime": "nodejs20.x" }
-  }
+    { "source": "/ruutu/(.*)", "destination": "/api/serve-ruutu?key=ruutu/$1" }
+  ]
 }

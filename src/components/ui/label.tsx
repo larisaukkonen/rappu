@@ -1,4 +1,5 @@
-import * as React from 'react'
+
+import React from 'react'
 import { cn } from '@/lib/utils'
 
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {

@@ -1,21 +1,19 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { head } from '@vercel/blob';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const runtime = 'edge';
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const key = url.searchParams.get('key');
+  if (!key) return new Response('Missing key', { status: 400 });
   try {
-    const file = (req.query.file as string) || '';
-    if (!file) return res.status(400).send('Missing file');
-
-    const key = `ruutu/${file}`;
-    const meta = await head(key); // heittää virheen jos puuttuu
-    const r = await fetch(meta.downloadUrl ?? meta.url);
-    if (!r.ok) return res.status(404).send('Not found');
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
-    const buf = Buffer.from(await r.arrayBuffer());
-    return res.status(200).send(buf);
-  } catch {
-    return res.status(404).send('Not found');
+    const { get } = await import('@vercel/blob');
+    const file = await get(key);
+    if (!file) return new Response('Not found', { status: 404 });
+    const blobRes = await fetch(file.url);
+    if (!blobRes.ok) return new Response('Not found', { status: 404 });
+    const headers = new Headers(blobRes.headers);
+    headers.set('cache-control', 'public, max-age=0, s-maxage=31536000, immutable');
+    return new Response(blobRes.body, { status: 200, headers });
+  } catch (e) {
+    return new Response('Not found', { status: 404 });
   }
 }

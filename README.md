@@ -1,31 +1,27 @@
-# Hallway Tenant Manager (starter from ChatGPT canvas)
 
-This is a ready-to-run Vite + React + TypeScript project containing the layout you built in ChatGPT.
+# Rappu – Hallinta & TV-esikatselu (Vercel + Vite)
 
-## Run locally
+Minimal project that matches your current canvas code and deploys to Vercel.
+
+## Local dev
 ```bash
-npm install
+npm i
 npm run dev
 ```
 
-## Build
-```bash
-npm run build
-npm run preview
-```
+Open http://localhost:5173
 
-## Push to GitHub
-1) Create a new empty repository on GitHub (no README).
-2) In this folder:
-```bash
-git init
-git add .
-git commit -m "init: hallway tenant manager starter"
-git branch -M main
-git remote add origin https://github.com/<USER>/<REPO>.git
-git push -u origin main
-```
+## Deploy to Vercel
+1. `npm i -g vercel` (if needed)
+2. `vercel` (link project and deploy)
+3. In Vercel dashboard, create/attach a **Blob Store** and link it to this project.
+4. Redeploy. The API routes under `/api/ruutu` will save HTML into Blob.
+5. The admin loads screens from `/ruutu/<SERIAL>.html` thanks to `vercel.json` rewrite to `api/serve-ruutu`.
+
+## API quick test
+- `GET /api/hello` → `{ ok: true }`
+- After saving from the app with serial `TEST123`, the TV file will be at `/ruutu/TEST123.html` (served via Blob).
 
 ## Notes
-- Minimal UI components are included in `src/components/ui/` so the code compiles without external UI kit.
-- `fetch('/api/hallways/:id')` will 404 in dev; the code already falls back to demo data.
+- UI components are minimal, Tailwind-based versions of the shadcn-style API.
+- If you later add the real shadcn/ui, you can swap imports without changing the App.

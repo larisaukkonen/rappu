@@ -1,17 +1,13 @@
-import * as React from 'react'
 
-type Props = {
-  id?: string
-  checked: boolean
-  onCheckedChange: (v: boolean) => void
-}
-export function Switch({ id, checked, onCheckedChange }: Props) {
+import React from 'react'
+import { cn } from '@/lib/utils'
+
+export function Switch({ id, checked, onCheckedChange }: { id?: string, checked?: boolean, onCheckedChange?: (v: boolean) => void }) {
   return (
-    <label htmlFor={id} style={{display:'inline-flex',alignItems:'center',gap:8,cursor:'pointer'}}>
-      <input id={id} type="checkbox" checked={checked} onChange={(e)=>onCheckedChange(e.target.checked)} style={{display:'none'}} />
-      <span style={{width:38,height:22,background: checked ? '#16a34a' : '#e5e7eb',borderRadius:999,position:'relative',transition:'all .15s'}}>
-        <span style={{position:'absolute',top:3,left: checked ? 18 : 3,width:16,height:16,background:'#fff',borderRadius:999,transition:'all .15s',boxShadow:'0 1px 2px rgba(0,0,0,.2)'}}/>
-      </span>
+    <label htmlFor={id} className={cn('relative inline-flex h-6 w-11 items-center')}>
+      <input id={id} type="checkbox" checked={!!checked} onChange={(e) => onCheckedChange?.(e.target.checked)} className="peer sr-only" />
+      <span className="absolute inset-0 rounded-full bg-zinc-300 peer-checked:bg-black transition-colors" />
+      <span className="relative left-1 inline-block h-4 w-4 rounded-full bg-white transition-all peer-checked:translate-x-5" />
     </label>
   )
 }
