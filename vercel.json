@@ -1,4 +1,3 @@
-
 {
   "rewrites": [
     { "source": "/ruutu/(.*)", "destination": "/api/serve-ruutu?key=ruutu/$1" }
