@@ -1,4 +1,4 @@
-// api/ruutu/index.ts  (fallback: vaatii filename:n)
+// api/ruutu/index.ts
 import { put } from "@vercel/blob";
 
 export default async function handler(req: any, res: any) {

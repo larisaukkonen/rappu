@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+
   const serial = String(req.query.serial || "").trim().toUpperCase();
   if (!serial) return res.status(400).send("Missing serial in URL");
 
@@ -14,7 +15,7 @@ export default async function handler(req: any, res: any) {
   if (!html || typeof html !== "string") return res.status(400).send("Missing html");
 
   const dir = (body?.dir || "ruutu").replace(/^\/*|\/*$/g, "");
-  const filename = (body?.filename || `${serial}.html`).replace(/[^a-zA-Z0-9._-]/g, "");
+  const filename = String(body?.filename || `${serial}.html`).replace(/[^a-zA-Z0-9._-]/g, "");
   const key = `${dir}/${filename}`;
 
   try {
