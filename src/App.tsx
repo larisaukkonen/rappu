@@ -7,6 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+// If your project has a cn helper (like in your old version), import it.
+// If not, uncomment the fallback below.
+import { cn as importedCn } from "@/lib/utils";
+// const importedCn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 // =============================================================
 // Types
@@ -28,7 +32,7 @@ export type Hallway = {
 // =============================================================
 // Helpers
 // =============================================================
-const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
+const cn = importedCn ?? ((...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" "));
 const uid = () => Math.random().toString(36).slice(2, 9);
 const RUUTU_DIR = "ruutu";
 
@@ -127,7 +131,7 @@ async function fetchHallwayById(hallwayId: string): Promise<Hallway> {
   return emptyHallway({ id: hallwayId });
 }
 
-type SaveResult = { ok: boolean; status?: number; statusText?: string; error?: string };
+export type SaveResult = { ok: boolean; status?: number; statusText?: string; error?: string };
 async function saveRuutu(hallway: Hallway, html: string, filename: string): Promise<SaveResult> {
   try {
     const serial = (hallway.serial || "").trim();
@@ -147,7 +151,7 @@ async function saveRuutu(hallway: Hallway, html: string, filename: string): Prom
 // =============================================================
 // Static HTML (LG TV) builder
 // =============================================================
-function buildStaticTvHtml(h: Hallway): string {
+export function buildStaticTvHtml(h: Hallway): string {
   const orientation: Orientation = h.orientation || "landscape";
   const floorsAsc = [...h.floors].sort((a, b) => a.level - b.level);
   const cols = buildColumnsShared(floorsAsc, orientation);
@@ -262,9 +266,13 @@ function buildStaticTvHtml(h: Hallway): string {
   return html;
 }
 
-function parseHallwayFromStaticHtml(html: string): Hallway | null {
+export function parseHallwayFromStaticHtml(html: string): Hallway | null {
   try {
-    const m = html.match(/<script id=\"__HALLWAY_DATA__\"[^>]*>([\\s\\S]*?)<\\/script>/);
+    // FIX: use a safe regex literal (no over-escaping) so TS doesn't misparse it.
+    const m = html.match(/<script id="__HALLWAY_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    // The above works in string context, but TypeScript may misparse regexes in some toolchains when embedded in TSX.
+    // If you ever see TS1161 again, switch to the version below which avoids double escaping:
+    // const m = html.match(/<script id="__HALLWAY_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     if (!m) return null;
     const json = m[1];
     const data = JSON.parse(json);
@@ -274,9 +282,10 @@ function parseHallwayFromStaticHtml(html: string): Hallway | null {
   }
 }
 
-function staticFilenameFor(h: Hallway) {
-  const serial = (h.serial || "").trim().toUpperCase();
-  return `${serial || "ESIKATSELU"}.html`;
+export function staticFilenameFor(h: Hallway) {
+  const serial = (h.serial || "").trim();
+  if (serial) return `${serial}.html`;
+  return `hallway-${h.id}-${h.orientation || "landscape"}.html`;
 }
 
 function downloadStaticHtmlFile(filename: string, html: string) {
@@ -292,9 +301,9 @@ function downloadStaticHtmlFile(filename: string, html: string) {
 }
 
 // =============================================================
-// Main component
+// Main component (keeps old default export name for compatibility)
 // =============================================================
-export default function HallwayTenantManager({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
+export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
   // Admin state
   const [hallway, setHallway] = useState<Hallway>(emptyHallway({ id: hallwayId }));
   const [showStartupPrompt, setShowStartupPrompt] = useState(true);
@@ -312,6 +321,25 @@ export default function HallwayTenantManager({ hallwayId = "demo-hallway" }: { h
   const frameRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
+
+  // Load initial model (demo)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const data = await fetchHallwayById(hallwayId);
+      if (!mounted) return;
+      if (!data.floors.length) {
+        const f1: Floor = { id: uid(), label: "Kerros 1", level: 1, apartments: [] };
+        const f2: Floor = { id: uid(), label: "Kerros 2", level: 2, apartments: [] };
+        setHallway({ ...data, floors: [f2, f1], orientation: data.orientation || "landscape" });
+      } else {
+        setHallway({ ...data, orientation: data.orientation || "landscape" });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [hallwayId]);
 
   const numColumns = useMemo(() => buildColumnsShared(hallway.floors, hallway.orientation || "landscape").length, [hallway]);
 
@@ -334,14 +362,14 @@ export default function HallwayTenantManager({ hallwayId = "demo-hallway" }: { h
     return () => ro.disconnect();
   }, [hallway, numColumns]);
 
-  // On mount: if URL has ?serial=XYZ, load that
+  // On mount: if URL has ?serial=XYZ, load that (compatible with your old path without ?raw=1)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const serialParam = (params.get("serial") || "").trim().toUpperCase();
     if (!serialParam) return;
     (async () => {
       try {
-        const res = await fetch(`/ruutu/${encodeURIComponent(serialParam)}.html?raw=1`, { cache: "no-store" });
+        const res = await fetch(`/ruutu/${encodeURIComponent(serialParam)}.html`, { cache: "no-store" });
         if (!res.ok) {
           setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.");
           return;
@@ -368,7 +396,7 @@ export default function HallwayTenantManager({ hallwayId = "demo-hallway" }: { h
       return;
     }
     try {
-      const res = await fetch(`/ruutu/${encodeURIComponent(s)}.html?raw=1`, { cache: "no-store" });
+      const res = await fetch(`/ruutu/${encodeURIComponent(s)}.html`, { cache: "no-store" });
       if (!res.ok) {
         setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.");
         return;
@@ -567,7 +595,7 @@ export default function HallwayTenantManager({ hallwayId = "demo-hallway" }: { h
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-[1400px] mx-auto">
         {/* Admin */}
-        <Card className={cx("shadow-sm", !showStartupPrompt ? "" : "blur-[1px]")}> 
+        <Card className={cn("shadow-sm", !showStartupPrompt ? "" : "blur-[1px]")}> 
           <CardHeader>
             <CardTitle>Hallinta</CardTitle>
           </CardHeader>
