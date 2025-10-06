@@ -358,7 +358,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     }
     fit();
     const ro = new ResizeObserver(() => fit());
-    if (frame) ro.observe(frame);
+    const fEl = frameRef.current;
+    if (fEl) ro.observe(fEl);
+    const gEl = gridRef.current;
+    if (gEl) ro.observe(gEl);
     return () => ro.disconnect();
   }, [hallway, numColumns]);
 
