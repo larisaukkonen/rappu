@@ -1,13 +1,13 @@
-// api/serve-ruutu.ts
+﻿// api/serve-ruutu.ts
 import { list } from "@vercel/blob";
 
-// /ruutu/<file> → /api/serve-ruutu?key=ruutu/<file>
+// /ruutu/<file> â†’ /api/serve-ruutu?key=ruutu/<file>
 export default async function handler(req: any, res: any) {
   try {
     const key = (req.query?.key as string) || "";
     if (!key) return res.status(400).send("Missing ?key=ruutu/<file>");
 
-    // Poimi sarja: ruutu/ABC123.html → ABC123
+    // Poimi sarja: ruutu/ABC123.html â†’ ABC123
     const m = key.match(/^ruutu\/([^/]+)\.html$/i);
     const serial = m?.[1] || "";
 
@@ -34,9 +34,11 @@ export default async function handler(req: any, res: any) {
     const entry = blobs.find((b) => b.pathname === key) ?? blobs[0];
     if (!entry) return res.status(404).send("Not Found");
 
-    // 1) Adminin raakapyyntö
+    // 1) Adminin raakapyyntÃ¶
     if (wantsRaw) {
-      const r = await fetch(entry.url);
+      const sep = entry.url.includes('?') ? '&' : '?';
+      const freshUrl = `${entry.url}${sep}ts=${Date.now()}`;
+      const r = await fetch(freshUrl);
       if (!r.ok) return res.status(502).send("Upstream fetch failed");
       const html = await r.text();
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -44,16 +46,17 @@ export default async function handler(req: any, res: any) {
       return res.status(200).send(html);
     }
 
-    // 2) Selain → adminiin
+    // 2) Selain â†’ adminiin
     if (!isTv && !hasTvParam && serial) {
       res.setHeader("Cache-Control", "no-store");
       return res.redirect(302, `/?serial=${encodeURIComponent(serial)}`);
     }
 
-    // 3) TV/webview → Blobin julkiseen URL:iin
+    // 3) TV/webview â†’ Blobin julkiseen URL:iin
     res.setHeader("Cache-Control", "public, max-age=60");
     return res.redirect(302, entry.url);
   } catch (err: any) {
     return res.status(500).send(`Error: ${err?.message || String(err)}`);
   }
 }
+
