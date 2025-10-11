@@ -249,24 +249,27 @@ function buildStaticTvHtml(h: Hallway): string {
     </div>
     <div id="footer">LG TV - staattinen näkymä</div>
   </div>
-  <script>(function(){
-    function fit(){\n      var USER_SCALE = ${Number((h as any)?.scale ?? 1)};\n      var C=document.getElementById('container');
-      var H=document.getElementById('header');
-      var G=document.getElementById('content');
-      var F=document.getElementById('footer');
-      if(!C||!G){return;}
-      var ch=C.clientHeight; var cw=C.clientWidth;
-      var usedTop=H?H.getBoundingClientRect().height:0;
-      var usedBottom=F?F.getBoundingClientRect().height:0;
-      var availH=Math.max(0,ch-usedTop-usedBottom);
-      var s=Math.min(1, availH/G.scrollHeight, cw/G.scrollWidth) * (USER_SCALE>0?USER_SCALE:1);
-      G.style.transform='scale('+s+')';
-      G.style.transformOrigin='top left';
-    }
-    window.addEventListener('resize', fit);
-    document.addEventListener('DOMContentLoaded', fit);
-    setTimeout(fit, 50);
-  })();</script>
+  
+<script>(function(){
+  var USER_SCALE = ${Number(h.scale ?? 1)};
+  function fit(){
+    var C=document.getElementById('container');
+    var H=document.getElementById('header');
+    var G=document.getElementById('content');
+    var F=document.getElementById('footer');
+    if(!C||!G){return;}
+    var ch=C.clientHeight; var cw=C.clientWidth;
+    var usedTop=H?H.getBoundingClientRect().height:0;
+    var usedBottom=F?F.getBoundingClientRect().height:0;
+    var availH=Math.max(0,ch-usedTop-usedBottom);
+    var s=Math.min(1, availH/G.scrollHeight, cw/G.scrollWidth) * (USER_SCALE>0?USER_SCALE:1);
+    G.style.transform='scale('+s+')';
+    G.style.transformOrigin='top left';
+  }
+  window.addEventListener('resize', fit);
+  document.addEventListener('DOMContentLoaded', fit);
+  setTimeout(fit, 50);
+})();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
 </body>
 </html>`;
@@ -466,7 +469,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     }
     try {
       setStartupError("");
-      const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html`, { cache: "no-store" });
+      const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
       if (!res.ok) {
         setStartupError("Antamallasi sarjanumerolla ei läydy tallennettua näyttää.");
         return;
@@ -989,6 +992,8 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     </div>
   );
 }
+
+
 
 
 
