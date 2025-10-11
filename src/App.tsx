@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 // const cn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
- * Käytävän asukasnäyttö – hallinta + TV-esikatselu
+ * Asukasnäyttö - hallinta + TV-esikatselu
  * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettynä kun esikatselu pois päältä)
  * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yrittää tallettaa sen /api/ruutu -päähän
  * - Käynnistyspromptti: hae talletettu näkymä sarjanumerolla tai aloita tyhjästä
@@ -25,7 +25,7 @@ export type Tenant = { id: string; surname: string };
 export type Apartment = {
   id: string;
   number: string; // esim. "101"
-  tenants: Tenant[]; // 1–2 sukunimeä
+  tenants: Tenant[]; // 1-2 sukunimeä
 };
 export type Floor = {
   id: string;
@@ -36,7 +36,7 @@ export type Floor = {
 export type Orientation = "portrait" | "landscape";
 export type Hallway = {
   id: string;
-  name: string; // esim. "Porraskäytävä B – itäsiipi"
+  name: string; // esim. "Porraskäytävä B itäsiipi"
   building?: string;
   isActive: boolean;
   orientation?: Orientation; // pysty (1080x1920) tai vaaka (1920x1080)
@@ -78,7 +78,7 @@ function computeLandscapeCounts(n: number): number[] {
   // Fallback > 12: täytä 3/kolumni ja lisää uusi kolumni tarvittaessa
   const base = 3;
   const minCols = 4;
-  const cols = Math.ceil((n - 12) / base) + minCols; // 13→5, 16→6, ...
+  const cols = Math.ceil((n - 12) / base) + minCols;
   const counts = Array(cols - 1).fill(base);
   counts.push(Math.max(0, n - base * (cols - 1)));
   return counts;
@@ -117,7 +117,7 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
   let idx = 0;
   for (let c = 0; c < counts.length; c++) {
     const take = counts[c];
-    out.push(items.slice(idx, idx + take).reverse()); // näytä alhaalta→ylös
+    out.push(items.slice(idx, idx + take).reverse()); // näytä alhaalta ylös
     idx += take;
   }
   return out;
@@ -174,7 +174,7 @@ function buildStaticTvHtml(h: Hallway): string {
                 .map((t) => escapeHtml(t.surname.toUpperCase()));
               const first = tenants[0] || '<span class="empty">(tyhjä)</span>';
               const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
-              const numberHtml = escapeHtml(apt.number || "—");
+              const numberHtml = escapeHtml(apt.number || "-");
               return (
                 `<div class="apt-row">` +
                 `<div class="apt-num">${numberHtml}</div>` +
@@ -229,7 +229,7 @@ function buildStaticTvHtml(h: Hallway): string {
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="cache-control" content="no-cache"/>
 <meta http-equiv="expires" content="0"/>
-<title>${escapeHtml(h.building || "Rakennus")} – ${escapeHtml(h.name)}</title>
+<title>${escapeHtml(h.building || "Rakennus")} - ${escapeHtml(h.name)}</title>
 <style>${css}</style>
 </head>
 <body>
@@ -245,7 +245,7 @@ function buildStaticTvHtml(h: Hallway): string {
         ${columnsHtml}
       </div>
     </div>
-    <div id="footer">LG TV – staattinen näkymä</div>
+    <div id="footer">LG TV - staattinen näkymä</div>
   </div>
   <script>(function(){
     function fit(){
@@ -364,7 +364,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     };
   }, [hallwayId]);
 
-  // CRUD – kerrokset, asunnot, asukkaat
+  // CRUD - kerrokset, asunnot, asukkaat
   const addFloor = () =>
     setHallway((h) => {
       const maxLevel = h.floors.reduce((m, f) => Math.max(m, f.level), 0);
@@ -483,7 +483,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       if (!saveRes.ok) {
         setServerSaveWarning(
           `Palvelintallennus epäonnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
-            `Loin ja latasin HTML:n paikallisesti – muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV löytää sen.`
+            `Loin ja latasin HTML:n paikallisesti - muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV löytää sen.`
         );
       } else {
         setServerSaveWarning("");
@@ -561,12 +561,13 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       {/* Editori (kolumni 1) */}
       <div className={cn(showPreview ? "" : "w-full max-w-4xl")}>        
         <Card className="shadow-lg">
-          <CardHeader className="flex-row items-center justify-between gap-2">
+          <CardHeader className="flex items-center justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Käytävän asukasnäyttö – hallinta</CardTitle>
+              <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - hallinta</CardTitle>
               <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa.</p>
             </div>
-            <div className="flex items-center gap-3">
+            <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="ml-auto rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+            <div className="hidden items-center gap-3">
               {/* Näytön suunta */}
               <div className="flex items-center gap-2">
                 <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
@@ -584,11 +585,24 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
                 <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
               </div>
-              <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+              <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="hidden rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
             </div>
           </CardHeader>
           <CardContent>
             {/* Sarjanumero */}
+            <div className="mb-3 flex items-center gap-4 justify-end">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
+                <select id="orientation" value={hallway.orientation || "landscape"} onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))} className="h-9 px-2 rounded-md border bg-white text-black">
+                  <option value="portrait">Pysty</option>
+                  <option value="landscape">Vaaka</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
+                <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
+              </div>
+            </div>
             <div className="mb-4">
               <Label htmlFor="device-serial">Uuden laitteen sarjanumero <span className="text-red-600" aria-hidden="true">*</span></Label>
               <Input
@@ -611,7 +625,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div>
                 <Label htmlFor="hallway-name">Käytävän nimi</Label>
-                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porraskäytävä B – itäsiipi" />
+                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porraskäytävä B - itäsiipi" />
               </div>
               <div>
                 <Label htmlFor="building-name">Rakennus</Label>
@@ -664,7 +678,16 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                                 <div className="col-span-12">
                                   <div className="flex items-center justify-between mt-4 mb-2">
                                     <Label>Asukkaat (1–2 sukunimeä)</Label>
-                                    <Button size="sm" onClick={() => addTenant(floor.id, apt.id)} className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0]"><Plus className="h-4 w-4 mr-1"/>Lisää sukunimi</Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => addTenant(floor.id, apt.id)}
+                                      disabled={apt.tenants.length >= 2}
+                                      className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
+                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunimeä" : undefined}
+                                    >
+                                      <Plus className="h-4 w-4 mr-1"/>
+                                      Lisää sukunimi
+                                    </Button>
                                   </div>
 
                                   <div className="space-y-2 mt-1">
@@ -697,9 +720,15 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       {/* TV-esikatselu (kolumni 2) */}
       {showPreview && (
         <Card data-preview-card className={cn("shadow-xl", lockClass)} aria-hidden={showStartupPrompt ? "true" : undefined}>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-xl flex items-center gap-2"><MonitorPlay className="h-5 w-5"/>TV-esikatselu</CardTitle>
-            <button aria-label="Avaa uuteen välilehteen" title="Avaa uuteen välilehteen" onClick={() => openStaticPreviewTab(hallway)} className="inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
+          <CardHeader className="flex items-center justify-between gap-2">
+            <CardTitle className="text-xl flex items-center gap-2">
+              <MonitorPlay className="h-5 w-5"/>
+              TV-esikatselu
+              <span className="ml-2 text-xs font-medium text-zinc-700 bg-zinc-100 rounded px-2 py-0.5">
+                {hallway.orientation === "portrait" ? "Pysty" : "Vaaka"}
+              </span>
+            </CardTitle>
+            <button aria-label="Avaa uuteen välilehteen" title="Avaa uuteen välilehteen" onClick={() => openStaticPreviewTab(hallway)} className="ml-auto inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
               <ExternalLink className="h-4 w-4" />
             </button>
           </CardHeader>
@@ -770,12 +799,25 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   useEffect(() => {
     const updateBox = () => {
       const el = containerRef.current;
-      const parent = el?.parentElement;
-      if (!parent) return;
-      const rect = parent.getBoundingClientRect();
-      const pw = rect.width;
-      const ph = rect.height;
-      const widthL = Math.min(pw, ph * (16 / 9));
+      const parent = el?.parentElement as HTMLElement | null;
+      if (!el || !parent) return;
+
+      // Respect element box-sizing. Tailwind sets border-box, where width/height include padding.
+      const cs = getComputedStyle(el);
+      const isBorderBox = (cs.boxSizing || "border-box").toLowerCase() === "border-box";
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+
+      const pw = parent.clientWidth;
+      const ph = parent.clientHeight;
+      // If border-box, we must NOT subtract padding from the target width/height we set.
+      const maxW = isBorderBox ? pw : Math.max(0, pw - padX);
+      const maxH = isBorderBox ? ph : Math.max(0, ph - padY);
+
+      // Fit 16:9 rectangle inside available area, with a tiny safety margin.
+      const safeW = Math.max(0, maxW - 1);
+      const safeH = Math.max(0, maxH - 1);
+      const widthL = Math.min(safeW, safeH * (16 / 9));
       const heightL = (widthL * 9) / 16;
       const w = orientation === "landscape" ? widthL : heightL;
       const h = orientation === "landscape" ? heightL : widthL;
@@ -849,7 +891,15 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   return (
     <div
       ref={containerRef}
-      style={{ width: boxSize.w || undefined, height: boxSize.h || undefined }}
+      style={{
+        width: boxSize.w || undefined,
+        height: boxSize.h || undefined,
+        // Center horizontally so left/right spacing inside padded parent is equal
+        margin: "0 auto",
+        // Never exceed parent content box
+        maxWidth: "100%",
+        maxHeight: "100%",
+      }}
       className="bg-black text-white rounded-2xl p-5 overflow-hidden relative"
     >
       <div ref={headerRef} className="flex items-start justify-between">
@@ -876,7 +926,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                 <div className="flex flex-col gap-3">
                   {floor.apartments.map((apt) => (
                     <div key={apt.id} className="grid grid-cols-[60px_1fr] gap-x-6">
-                      <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "—"}</div>
+                      <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
                       <div className="text-sm font-semibold break-words whitespace-normal">
                         {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
                           <span className="opacity-40">(tyhjä)</span>
@@ -901,7 +951,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       </div>
 
       <div ref={footerRef} className="absolute left-0 right-0 bottom-0 text-center text-[10px] opacity-60 pb-1">
-        Staattinen esikatselu
+        Esikatselu
       </div>
     </div>
   );
