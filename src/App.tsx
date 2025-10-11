@@ -245,7 +245,7 @@ function buildStaticTvHtml(h: Hallway): string {
         ${columnsHtml}
       </div>
     </div>
-    <div id="footer">LG TV â€“ staattinen näkymä</div>
+    <div id="footer">LG TV - staattinen näkymä</div>
   </div>
   <script>(function(){
     function fit(){
@@ -699,7 +699,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
                                 <div className="col-span-12">
                                   <div className="flex items-center justify-between mt-4 mb-2">
-                                    <Label>Asukkaat (1â€“2 sukunimeä)</Label>
+                                    <Label>Asukkaat (1-2)</Label>
                                     <Button
                                       size="sm"
                                       onClick={() => addTenant(floor.id, apt.id)}
