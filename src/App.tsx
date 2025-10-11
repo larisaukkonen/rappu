@@ -594,9 +594,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             </div>
             <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="ml-auto rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
             <div className="hidden items-center gap-3">
-              {/* Näytän suunta */}
+              {/* Näytön suunta */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="orientation" className="text-sm">Näytän suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
                 <select
                   id="orientation"
                   value={hallway.orientation || "landscape"}
@@ -623,7 +623,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
                 <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
               </div>
-                <Label htmlFor="orientation" className="text-sm">Näytän suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
                 <select id="orientation" value={hallway.orientation || "landscape"} onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))} className="h-9 px-2 rounded-md border bg-white text-black">
                   <option value="portrait">Pysty</option>
                   <option value="landscape">Vaaka</option>
