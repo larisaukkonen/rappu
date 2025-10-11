@@ -13,8 +13,21 @@ export default async function handler(req: any, res: any) {
 
     const ua = String(req.headers["user-agent"] || "").toLowerCase();
     const isTv = /webos|web0s|smarttv|netcast|lg\s?tv/.test(ua);
-    const hasTvParam = String(req.query?.tv || "") === "1";
-    const wantsRaw = String(req.query?.raw || "") === "1";
+
+    // Case-insensitive query param lookup and tolerant truthy values
+    const getQuery = (name: string): string => {
+      const q = (req.query ?? {}) as Record<string, unknown>;
+      for (const k of Object.keys(q)) {
+        if (k.toLowerCase() === name.toLowerCase()) {
+          const v = q[k];
+          return Array.isArray(v) ? String(v[0]) : String(v ?? "");
+        }
+      }
+      return "";
+    };
+    const isTruthy = (v: string) => /^(1|true|yes)$/i.test(v);
+    const hasTvParam = isTruthy(getQuery("tv"));
+    const wantsRaw = isTruthy(getQuery("raw"));
 
     // Etsi blob
     const { blobs } = await list({ prefix: key, limit: 1 });
