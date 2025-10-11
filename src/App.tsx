@@ -1,7 +1,7 @@
-ï»¿Ã¯Â»Â¿import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils"; // jos projektissa ei ole tÃƒÂ¤tÃƒÂ¤, voit korvata paikallisella apurilla (kommentti alla)
+import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,46 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-// Varmuuden vuoksi: jos cn puuttuu projektistasi, kommentoi yllÃƒÂ¤ oleva import ja kÃƒÂ¤ytÃƒÂ¤ tÃƒÂ¤tÃƒÂ¤:
+// Varmuuden vuoksi: jos cn puuttuu projektistasi, kommentoi yllä oleva import ja käytä tätä:
 // const cn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
- * AsukasnÃƒÂ¤yttÃƒÂ¶ - hallinta + TV-esikatselu
- * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettynÃƒÂ¤ kun esikatselu pois pÃƒÂ¤ÃƒÂ¤ltÃƒÂ¤)
- * - Tallennus tuottaa staattisen HTML:n (LG TV â€“ staattinen nÃ¤kymÃ¤<Hallway>): Hallway => ({
+ * Asukasnäyttö - hallinta + TV-esikatselu
+ * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettynä kun esikatselu pois päältä)
+ * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yrittää tallettaa sen /api/ruutu -päähän
+ * - Käynnistyspromptti: hae talletettu näkymä sarjanumerolla tai aloita tyhjästä
+ */
+
+// ---------- Tyypit ----------
+export type Tenant = { id: string; surname: string };
+export type Apartment = {
+  id: string;
+  number: string; // esim. "101"
+  tenants: Tenant[]; // 1-2 sukunimeä
+};
+export type Floor = {
+  id: string;
+  label: string; // esim. "Kerros 3"
+  level: number; // numeerinen järjestysavain
+  apartments: Apartment[];
+};
+export type Orientation = "portrait" | "landscape";
+export type Hallway = {
+  id: string;
+  name: string; // esim. "Porraskäytävä B itäsiipi"
+  building?: string;
+  isActive: boolean;
+  orientation?: Orientation; // pysty (1080x1920) tai vaaka (1920x1080)
+  serial?: string; // laitteen sarjanumero
+  floors: Floor[]; // lajiteltu level:n mukaan
+};
+
+// ---------- Apuja ----------
+const uid = () => Math.random().toString(36).slice(2, 9);
+const apartmentPlaceholder = (level: number, idx: number) => `${level * 100 + idx + 1}`;
+const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   id: partial?.id || "demo-hallway",
-  name: partial?.name || "KÃƒÂ¤ytÃƒÂ¤vÃƒÂ¤ A",
+  name: partial?.name || "Käytävä A",
   building: partial?.building || "",
   isActive: partial?.isActive ?? true,
   orientation: partial?.orientation || "landscape",
@@ -44,7 +75,7 @@ function computeLandscapeCounts(n: number): number[] {
     12: [3, 3, 3, 3],
   };
   if (map[n]) return map[n];
-  // Fallback > 12: tÃƒÂ¤ytÃƒÂ¤ 3/kolumni ja lisÃƒÂ¤ÃƒÂ¤ uusi kolumni tarvittaessa
+  // Fallback > 12: täytä 3/kolumni ja lisää uusi kolumni tarvittaessa
   const base = 3;
   const minCols = 4;
   const cols = Math.ceil((n - 12) / base) + minCols;
@@ -86,7 +117,7 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
   let idx = 0;
   for (let c = 0; c < counts.length; c++) {
     const take = counts[c];
-    out.push(items.slice(idx, idx + take).reverse()); // nÃƒÂ¤ytÃƒÂ¤ alhaalta ylÃƒÂ¶s
+    out.push(items.slice(idx, idx + take).reverse()); // näytä alhaalta ylös
     idx += take;
   }
   return out;
@@ -95,9 +126,9 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
 // Polku ruudun julkaisuihin
 const RUUTU_DIR = "ruutu";
 
-// ---------- Backend-API:t (sovita omaan ympÃƒÂ¤ristÃƒÂ¶ÃƒÂ¶n) ----------
+// ---------- Backend-API:t (sovita omaan ympäristöön) ----------
 async function fetchHallway(hallwayId: string): Promise<Hallway> {
-  // TÃƒÂ¤ssÃƒÂ¤ demossa palautetaan tyhjÃƒÂ¤, jotta appi kÃƒÂ¤ynnistyy ilman backendia
+  // Tässä demossa palautetaan tyhjä, jotta appi käynnistyy ilman backendia
   return emptyHallway({ id: hallwayId });
 }
 
@@ -118,7 +149,11 @@ async function saveRuutu(hallway: Hallway, html: string, filename: string): Prom
   }
 }
 
-// --- LG TV â€“ staattinen nÃ¤kymÃ¤</g, "&lt;")
+// --- LG TV: staattisen HTML:n muodostus ---
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
@@ -137,7 +172,7 @@ function buildStaticTvHtml(h: Hallway): string {
               const tenants = (apt.tenants || [])
                 .filter((t) => t && t.surname && t.surname.trim().length > 0)
                 .map((t) => escapeHtml(t.surname.toUpperCase()));
-              const first = tenants[0] || '<span class="empty">(tyhjÃƒÂ¤)</span>';
+              const first = tenants[0] || '<span class="empty">(tyhjä)</span>';
               const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
               const numberHtml = escapeHtml(apt.number || "-");
               return (
@@ -210,7 +245,7 @@ function buildStaticTvHtml(h: Hallway): string {
         ${columnsHtml}
       </div>
     </div>
-    <div id="footer">LG TV â€“ staattinen nÃ¤kymÃ¤</div>
+    <div id="footer">LG TV - staattinen näkymä</div>
   </div>
   <script>(function(){
     function fit(){
@@ -264,7 +299,7 @@ function parseHallwayFromStaticHtml(html: string): Hallway | null {
   }
 }
 
-// PÃƒÂ¤ÃƒÂ¤te-tiedostonimi (sarjanumero etusijalla)
+// Pääte-tiedostonimi (sarjanumero etusijalla)
 function staticFilenameFor(h: Hallway): string {
   const serial = (h.serial || "").trim();
   if (serial) return `${serial}.html`;
@@ -280,11 +315,11 @@ function openStaticPreviewTab(h: Hallway) {
     if (win && typeof win.focus === "function") win.focus();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   } catch (e) {
-    console.error("Esikatselun avaaminen epÃƒÂ¤onnistui", e);
+    console.error("Esikatselun avaaminen epäonnistui", e);
   }
 }
 
-// ---------- PÃƒÂ¤ÃƒÂ¤komponentti ----------
+// ---------- Pääkomponentti ----------
 export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
   const [hallway, setHallway] = useState<Hallway>(emptyHallway());
   const [status, setStatus] = useState<string>("");
@@ -295,7 +330,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [serverSaveWarning, setServerSaveWarning] = useState<string>("");
 
-  // KÃƒÂ¤ynnistyspromptti
+  // Käynnistyspromptti
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
   const [startupSerial, setStartupSerial] = useState<string>("");
   const [startupError, setStartupError] = useState<string>("");
@@ -310,7 +345,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         setLoading(true);
         const data = await fetchHallway(hallwayId).catch(() => emptyHallway());
         if (!mounted) return;
-        // Esimerkkidata tyhjÃƒÂ¤ÃƒÂ¤n nÃƒÂ¤kymÃƒÂ¤ÃƒÂ¤n
+        // Esimerkkidata tyhjään näkymään
         if (!data.floors.length) {
           const f1: Floor = { id: uid(), label: "Kerros 1", level: 1, apartments: [] };
           const f2: Floor = { id: uid(), label: "Kerros 2", level: 2, apartments: [] };
@@ -399,7 +434,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
   const sortedFloors = useMemo(() => [...hallway.floors].sort((a, b) => b.level - a.level), [hallway.floors]);
 
-  // Jos URLissa on ?serial=ABC, yritÃƒÂ¤ hakea talletettu nÃƒÂ¤kymÃƒÂ¤ automaattisesti adminissa
+  // Jos URLissa on ?serial=ABC, yritä hakea talletettu näkymä automaattisesti adminissa
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('serial');
     if (s) {
@@ -409,42 +444,42 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         try {
           setStartupError("");
           const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: 'no-store' });
-          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.'); return; }
+          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.'); return; }
           const text = await res.text();
           const data = parseHallwayFromStaticHtml(text);
-          if (!data) { setStartupError('Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.'); return; }
+          if (!data) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.'); return; }
           setHallway({ ...emptyHallway(), ...data, serial });
           setShowStartupPrompt(false);
         } catch {
-          setStartupError('Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.');
+          setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.');
         }
       })();
     }
   }, []);
-  // KÃƒÂ¤ynnistyspromptin toiminnot
+  // Käynnistyspromptin toiminnot
   const handleStartupFetch = async () => {
     const serial = startupSerial.trim().toUpperCase();
     if (!serial) {
-      setStartupError("SyÃƒÂ¶tÃƒÂ¤ sarjanumero.");
+      setStartupError("Syötä sarjanumero.");
       return;
     }
     try {
       setStartupError("");
       const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html`, { cache: "no-store" });
       if (!res.ok) {
-        setStartupError("Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.");
+        setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.");
         return;
       }
       const text = await res.text();
       const data = parseHallwayFromStaticHtml(text);
       if (!data) {
-        setStartupError("Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.");
+        setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.");
         return;
       }
       setHallway({ ...emptyHallway(), ...data, serial });
       setShowStartupPrompt(false);
     } catch (e) {
-      setStartupError("Antamallasi sarjanumerolla ei lÃƒÂ¶ydy tallennettua nÃƒÂ¤yttÃƒÂ¶ÃƒÂ¤.");
+      setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näyttöä.");
     }
   };
   const handleCreateNew = () => {
@@ -456,7 +491,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const handleSave = async () => {
     const serial = hallway.serial?.trim();
     if (!serial) {
-      setError("SyÃƒÂ¶tÃƒÂ¤ laitteen sarjanumero ennen tallennusta.");
+      setError("Syötä laitteen sarjanumero ennen tallennusta.");
       return;
     }
     try {
@@ -469,8 +504,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       const saveRes = await saveRuutu(hallway, html, fname);
       if (!saveRes.ok) {
         setServerSaveWarning(
-          `Palvelintallennus epÃƒÂ¤onnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
-            `Loin ja latasin HTML:n paikallisesti - muista siirtÃƒÂ¤ÃƒÂ¤ tiedosto palvelimelle polkuun ${relPath} jotta TV lÃƒÂ¶ytÃƒÂ¤ÃƒÂ¤ sen.`
+          `Palvelintallennus epäonnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
+            `Loin ja latasin HTML:n paikallisesti - muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV löytää sen.`
         );
       } else {
         setServerSaveWarning("");
@@ -484,7 +519,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       setTimeout(() => setStatus(""), 3000);
     } catch (e: any) {
       setStatus("");
-      setError(e?.message || "Tallennus epÃƒÂ¤onnistui");
+      setError(e?.message || "Tallennus epäonnistui");
     }
   };
 
@@ -507,7 +542,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
     // Palauta ja tarkista JSON-upotus
     const restored = parseHallwayFromStaticHtml(html);
-    console.assert(!!restored && typeof restored === "object", "Upotetun JSON:n palautus epÃƒÂ¤onnistui");
+    console.assert(!!restored && typeof restored === "object", "Upotetun JSON:n palautus epäonnistui");
   }, [hallway]);
 
   if (loading) {
@@ -521,7 +556,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         showPreview ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "flex justify-center"
       )}
     >
-      {/* KÃƒÂ¤ynnistyspromptti (overlay) */}
+      {/* Käynnistyspromptti (overlay) */}
       {showStartupPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white text-black p-6 shadow-2xl">
@@ -537,7 +572,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               </div>
               <div className="h-px bg-[#aaaaaa]" />
               <div className="flex items-center justify-between">
-                <div className="text-sm opacity-80">Aloita tyhjÃƒÂ¤stÃƒÂ¤ nÃƒÂ¤kymÃƒÂ¤stÃƒÂ¤..</div>
+                <div className="text-sm opacity-80">Aloita tyhjästä näkymästä.</div>
                 <Button type="button" variant="secondary" onClick={handleCreateNew}>Luo uusi</Button>
               </div>
             </div>
@@ -550,14 +585,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         <Card className="shadow-lg">
           <CardHeader className="flex items-center justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>AsukasnÃƒÂ¤yttÃƒÂ¶ - hallinta</CardTitle>
-              <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiÃƒÂ¤. Muutokset nÃƒÂ¤kyvÃƒÂ¤t oikealla esikatselussa.</p>
+              <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - hallinta</CardTitle>
+              <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa.</p>
             </div>
             <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="ml-auto rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
             <div className="hidden items-center gap-3">
-              {/* NÃƒÂ¤ytÃƒÂ¶n suunta */}
+              {/* Näytön suunta */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="orientation" className="text-sm">NÃƒÂ¤ytÃƒÂ¶n suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
                 <select
                   id="orientation"
                   value={hallway.orientation || "landscape"}
@@ -579,7 +614,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             {/* Sarjanumero */}
             <div className="mb-3 flex items-center gap-4 justify-end">
               <div className="flex items-center gap-2">
-                <Label htmlFor="orientation" className="text-sm">NÃƒÂ¤ytÃƒÂ¶n suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
                 <select id="orientation" value={hallway.orientation || "landscape"} onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))} className="h-9 px-2 rounded-md border bg-white text-black">
                   <option value="portrait">Pysty</option>
                   <option value="landscape">Vaaka</option>
@@ -611,8 +646,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div>
-                <Label htmlFor="hallway-name">KÃƒÂ¤ytÃƒÂ¤vÃƒÂ¤n nimi</Label>
-                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. PorraskÃƒÂ¤ytÃƒÂ¤vÃƒÂ¤ B - itÃƒÂ¤siipi" />
+                <Label htmlFor="hallway-name">Käytävän nimi</Label>
+                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porraskäytävä B - itäsiipi" />
               </div>
               <div>
                 <Label htmlFor="building-name">Rakennus</Label>
@@ -622,7 +657,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
-              <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>LisÃƒÂ¤ÃƒÂ¤ kerros</Button>
+              <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää kerros</Button>
             </div>
 
             <ScrollArea className="h-[60vh] pr-2">
@@ -636,14 +671,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder="Kerros 3" />
                       </div>
                       <div className="col-span-12 md:col-span-6">
-                        <Label>Taso (jÃƒÂ¤rjestys)</Label>
+                        <Label>Taso (järjestys)</Label>
                         <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
                       </div>
 
                       <div className="col-span-12">
                         <div className="flex items-center justify-between mt-4">
                           <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
-                          <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>LisÃƒÂ¤ÃƒÂ¤ asunto</Button>
+                          <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää asunto</Button>
                         </div>
 
                         <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -664,16 +699,16 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
                                 <div className="col-span-12">
                                   <div className="flex items-center justify-between mt-4 mb-2">
-                                    <Label>Asukkaat (1Ã¢â‚¬â€œ2 sukunimeÃƒÂ¤)</Label>
+                                    <Label>Asukkaat (1–2 sukunimeä)</Label>
                                     <Button
                                       size="sm"
                                       onClick={() => addTenant(floor.id, apt.id)}
                                       disabled={apt.tenants.length >= 2}
                                       className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
-                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunimeÃƒÂ¤" : undefined}
+                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunimeä" : undefined}
                                     >
                                       <Plus className="h-4 w-4 mr-1"/>
-                                      LisÃƒÂ¤ÃƒÂ¤ sukunimi
+                                      Lisää sukunimi
                                     </Button>
                                   </div>
 
@@ -715,7 +750,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 {hallway.orientation === "portrait" ? "Pysty" : "Vaaka"}
               </span>
             </CardTitle>
-            <button aria-label="Avaa uuteen vÃƒÂ¤lilehteen" title="Avaa uuteen vÃƒÂ¤lilehteen" onClick={() => openStaticPreviewTab(hallway)} className="ml-auto inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
+            <button aria-label="Avaa uuteen välilehteen" title="Avaa uuteen välilehteen" onClick={() => openStaticPreviewTab(hallway)} className="ml-auto inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
               <ExternalLink className="h-4 w-4" />
             </button>
           </CardHeader>
@@ -732,7 +767,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <DialogTitle>Tallennus onnistui</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p>NÃƒÂ¤kymÃƒÂ¤ tallennettu. TV hakee sen omalla sarjanumerollaan.</p>
+            <p>Näkymä tallennettu. TV hakee sen omalla sarjanumerollaan.</p>
             <div className="text-sm">Absoluuttinen URL:</div>
             <div className="flex gap-2">
               <Input readOnly value={savedUrl || ""} />
@@ -782,7 +817,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     for (let n = 1; n <= 15; n++) check(n, computePortraitCounts(n), expectedPortrait[n]);
   }, [orientation]);
 
-  // Laske esikatselulaatikon koko niin, ettÃƒÂ¤ pysty = vaaka kÃƒÂ¤ÃƒÂ¤nteisenÃƒÂ¤
+  // Laske esikatselulaatikon koko niin, että pysty = vaaka käänteisenä
   useEffect(() => {
     const updateBox = () => {
       const el = containerRef.current;
@@ -813,7 +848,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       } else if (lastLandscapeRef.current) {
         const prev = lastLandscapeRef.current;
         const near = (a: number, b: number) => Math.abs(a - b) <= 2;
-        console.assert(near(w, prev.h) && near(h, prev.w), "Pysty-koon pitÃƒÂ¤isi olla vaakakoon kÃƒÂ¤ÃƒÂ¤nteinen", { w, h, prev });
+        console.assert(near(w, prev.h) && near(h, prev.w), "Pysty-koon pitäisi olla vaakakoon käänteinen", { w, h, prev });
       }
       setBoxSize({ w: Math.floor(w), h: Math.floor(h) });
     };
@@ -827,7 +862,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     };
   }, [orientation]);
 
-  // Skaala + sarakemÃƒÂ¤ÃƒÂ¤rÃƒÂ¤
+  // Skaala + sarakemäärä
   useEffect(() => {
     const fitAndCols = () => {
       const C = containerRef.current;
@@ -872,7 +907,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   useEffect(() => {
     const total = floorsAsc.length;
     const sum = columns.reduce((acc, c) => acc + c.length, 0);
-    if (sum !== total) console.warn("Sarakejako ei tÃƒÂ¤smÃƒÂ¤ÃƒÂ¤ kerrosten lukumÃƒÂ¤ÃƒÂ¤rÃƒÂ¤ÃƒÂ¤n", { total, sum, numCols });
+    if (sum !== total) console.warn("Sarakejako ei täsmää kerrosten lukumäärään", { total, sum, numCols });
   }, [floorsAsc, columns, numCols]);
 
   return (
@@ -916,7 +951,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                       <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
                       <div className="text-sm font-semibold break-words whitespace-normal">
                         {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
-                          <span className="opacity-40">(tyhjÃƒÂ¤)</span>
+                          <span className="opacity-40">(tyhjä)</span>
                         )}
                       </div>
                       {apt.tenants
