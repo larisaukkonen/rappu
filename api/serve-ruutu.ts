@@ -4,6 +4,13 @@ import { list } from "@vercel/blob";
 // /ruutu/<file> â†’ /api/serve-ruutu?key=ruutu/<file>
 export default async function handler(req: any, res: any) {
   try {
+    // CORS preflight
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+      return res.status(204).end();
+    }
     const key = (req.query?.key as string) || "";
     if (!key) return res.status(400).send("Missing ?key=ruutu/<file>");
 
@@ -34,6 +41,15 @@ export default async function handler(req: any, res: any) {
     const entry = blobs.find((b) => b.pathname === key) ?? blobs[0];
     if (!entry) return res.status(404).send("Not Found");
 
+    // Headers to allow embedding (iframe) and cross-origin resource loads
+    const allowEmbed = () => {
+      res.setHeader("Content-Security-Policy", "frame-ancestors *");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    };
+
     // 1) Adminin raakapyyntÃ¶
     if (wantsRaw) {
       const sep = entry.url.includes('?') ? '&' : '?';
@@ -43,6 +59,7 @@ export default async function handler(req: any, res: any) {
       const html = await r.text();
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Cache-Control", "no-store");
+      allowEmbed();
       return res.status(200).send(html);
     }
 
@@ -53,6 +70,18 @@ export default async function handler(req: any, res: any) {
     }
 
     // 3) TV/webview â†’ Blobin julkiseen URL:iin
+    if (isTv || hasTvParam) {
+      const sep = entry.url.includes('?') ? '&' : '?';
+      const freshUrl = `${entry.url}${sep}ts=${Date.now()}`;
+      const r = await fetch(freshUrl);
+      if (!r.ok) return res.status(502).send("Upstream fetch failed");
+      const html = await r.text();
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60");
+      allowEmbed();
+      return res.status(200).send(html);
+    }
+
     res.setHeader("Cache-Control", "public, max-age=60");
     return res.redirect(302, entry.url);
   } catch (err: any) {
