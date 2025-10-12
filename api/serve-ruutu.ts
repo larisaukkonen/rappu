@@ -6,6 +6,7 @@ export default async function handler(req: any, res: any) {
   try {
     // CORS preflight
     if (req.method === "OPTIONS") {
+      res.removeHeader?.("X-Frame-Options");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
@@ -43,11 +44,16 @@ export default async function handler(req: any, res: any) {
 
     // Headers to allow embedding (iframe) and cross-origin resource loads
     const allowEmbed = () => {
-      res.setHeader("Content-Security-Policy", "frame-ancestors *");
+      const frameAncestors = (process.env.FRAME_ANCESTORS || "*").trim();
+      // Ensure no legacy XFO blocks us (if set by platform defaults)
+      res.removeHeader?.("X-Frame-Options");
+      res.setHeader("Content-Security-Policy", `frame-ancestors ${frameAncestors}`);
+      // CORS: keep permissive for served HTML; can be tightened later.
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Referrer-Policy", "no-referrer");
     };
 
     // 1) Adminin raakapyyntÃ¶

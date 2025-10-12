@@ -2,6 +2,14 @@
 import { put } from "@vercel/blob";
 
 export default async function handler(req: any, res: any) {
+  // Basic CORS for cross-origin saves if used from other origins
+  if (req.method === "OPTIONS") {
+    res.removeHeader?.("X-Frame-Options");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    return res.status(204).end();
+  }
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   let body: any;
@@ -24,8 +32,10 @@ export default async function handler(req: any, res: any) {
       contentType: "text/html; charset=utf-8",
       cacheControlMaxAge: 0,
     });
+    res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(200).json({ ok: true, url, key });
   } catch (e: any) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(500).send(`Blob save failed: ${e?.message || String(e)}`);
   }
 }

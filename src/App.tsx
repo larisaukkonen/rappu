@@ -247,7 +247,7 @@ function buildStaticTvHtml(h: Hallway): string {
         ${columnsHtml}
       </div>
     </div>
-    <div id="footer">LG TV - staattinen näkymä</div>
+    <div id="footer"></div>
   </div>
   
 <script>(function(){
