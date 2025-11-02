@@ -1,0 +1,220 @@
+  const [scaleHint, setScaleHint] = useState(1);
+  const [numCols, setNumCols] = useState<number>(1);
+
+  const buildColumns = (items: Floor[]): Floor[][] => buildColumnsShared(items, orientation);
+  const [columns, setColumns] = useState<Floor[][]>(buildColumns(floorsAsc));
+
+  useEffect(() => {
+    const expectedLandscape: Record<number, number[]> = {
+      1: [1], 2: [1, 1], 3: [2, 1], 4: [2, 2], 5: [2, 2, 1], 6: [2, 2, 2], 7: [2, 2, 2, 1], 8: [2, 2, 2, 2], 9: [3, 2, 2, 2], 10: [3, 3, 2, 2], 11: [3, 3, 3, 2], 12: [3, 3, 3, 3],
+    };
+    const expectedPortrait: Record<number, number[]> = {
+      1: [1], 2: [2], 3: [3], 4: [4], 5: [3, 2], 6: [3, 3], 7: [4, 3], 8: [4, 4], 9: [5, 4], 10: [5, 5], 11: [6, 5], 12: [6, 6], 13: [5, 5, 3], 14: [5, 5, 4], 15: [5, 5, 5],
+    };
+    const check = (n: number, got: number[], want?: number[]) => {
+      if (want && want.length && got.join(",") !== want.join(",")) {
+        console.warn("Sarakejako ei vastaa odotusta", { orientation, n, got, want });
+      }
+    };
+    for (let n = 1; n <= 12; n++) check(n, computeLandscapeCounts(n), expectedLandscape[n]);
+    for (let n = 1; n <= 15; n++) check(n, computePortraitCounts(n), expectedPortrait[n]);
+  }, [orientation]);
+
+  // Laske esikatselulaatikon koko niin, ett‰ pysty = vaaka k‰‰nteisen‰
+  useEffect(() => {
+    const updateBox = () => {
+      const el = containerRef.current;
+      const parent = el?.parentElement as HTMLElement | null;
+      if (!el || !parent) return;
+
+      // Respect element box-sizing. Tailwind sets border-box, where width/height include padding.
+      const cs = getComputedStyle(el);
+      const isBorderBox = (cs.boxSizing || "border-box").toLowerCase() === "border-box";
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+
+      const pw = parent.clientWidth;
+      const ph = parent.clientHeight;
+      // If border-box, we must NOT subtract padding from the target width/height we set.
+      const maxW = isBorderBox ? pw : Math.max(0, pw - padX);
+      const maxH = isBorderBox ? ph : Math.max(0, ph - padY);
+
+      // Fit 16:9 rectangle inside available area, with a tiny safety margin.
+      const safeW = Math.max(0, maxW - 1);
+      const safeH = Math.max(0, maxH - 1);
+      const widthL = Math.min(safeW, safeH * (16 / 9));
+      const heightL = (widthL * 9) / 16;
+      const w = orientation === "landscape" ? widthL : heightL;
+      const h = orientation === "landscape" ? heightL : widthL;
+      if (orientation === "landscape") {
+        lastLandscapeRef.current = { w: widthL, h: heightL };
+      } else if (lastLandscapeRef.current) {
+        const prev = lastLandscapeRef.current;
+        const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+        console.assert(near(w, prev.h) && near(h, prev.w), "Pysty-koon pit‰isi olla vaakakoon k‰‰nteinen", { w, h, prev });
+      }
+      setBoxSize({ w: Math.floor(w), h: Math.floor(h) });
+    };
+    updateBox();
+    const ro = new ResizeObserver(updateBox);
+    if (containerRef.current?.parentElement) ro.observe(containerRef.current.parentElement);
+    window.addEventListener("resize", updateBox);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateBox);
+    };
+  }, [orientation]);
+
+  // Skaalaus: sovita design-koko (1920x1080 tai 1080x1920) esikatselulaatikkoon
+  useEffect(() => {
+    const fitAndCols = () => {
+      const C = containerRef.current;
+      const G = gridRef.current;
+      if (!C || !G) return;
+      const baseW = orientation === "landscape" ? 1920 : 1080;
+      const baseH = orientation === "landscape" ? 1080 : 1920;
+      // Aseta design-mitat sis‰iseen sis‰ltˆˆn, skaalataan t‰m‰n ymp‰rille
+      (G as HTMLDivElement).style.width = `${baseW}px`;
+      (G as HTMLDivElement).style.height = `${baseH}px`;
+      // Ota huomioon containerin padding niin, ett‰ skaalaus mahtuu sis‰sis‰ltˆˆn
+      const cs = getComputedStyle(C);
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const cw = Math.max(0, C.clientWidth - padX);
+      const ch = Math.max(0, C.clientHeight - padY);
+      const s = Math.min(cw / baseW, ch / baseH);
+      setGridScale(Number.isFinite(s) && s > 0 ? s : 1);
+    };
+
+    fitAndCols();
+    const ro = new ResizeObserver(() => fitAndCols());
+    if (containerRef.current) ro.observe(containerRef.current);
+    if (gridRef.current) ro.observe(gridRef.current);
+    // headerRef not required for scaling anymore
+    window.addEventListener("resize", fitAndCols);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", fitAndCols);
+    };
+  }, [orientation, numCols, hallway, floorsAsc.length]);
+
+  useEffect(() => {
+    setColumns(buildColumns(floorsAsc));
+  }, [floorsAsc, orientation]);
+
+  useEffect(() => {
+    const total = floorsAsc.length;
+    const sum = columns.reduce((acc, c) => acc + c.length, 0);
+    if (sum !== total) console.warn("Sarakejako ei t‰sm‰‰ kerrosten lukum‰‰r‰‰n", { total, sum, numCols });
+  }, [floorsAsc, columns, numCols]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: boxSize.w || undefined,
+        height: boxSize.h || undefined,
+        // Center horizontally so left/right spacing inside padded parent is equal
+        margin: "0 auto",
+        // Never exceed parent content box
+        maxWidth: "100%",
+        maxHeight: "100%",
+      }}
+      className="bg-black text-white font-sans rounded-2xl p-5 overflow-hidden relative"
+    >
+      <div
+        ref={gridRef}
+        style={{
+          transform: `scale(${(gridScale * (hallway.scale ?? 1)).toFixed(3)})`,
+          transformOrigin: "top left",
+          width: orientation === "landscape" ? 1920 : 1080,
+          height: orientation === "landscape" ? 1080 : 1920,
+        }}
+      >
+        <div style={{ padding: "20px 20px 0 20px", boxSizing: "border-box" }}>
+          <div className="flex items-start justify-between gap-6 w-full">
+            <WeatherClock
+              city={hallway.weatherCity}
+              lat={typeof hallway.weatherLat === "number" ? hallway.weatherLat : undefined}
+              lon={typeof hallway.weatherLon === "number" ? hallway.weatherLon : undefined}
+              clockMode={hallway.clockMode}
+              manualDate={hallway.clockDate}
+              manualTime={hallway.clockTime}
+            />
+            <div className="ml-auto text-right">
+              <div style={{ fontSize: 28, fontWeight: 600 }} className="tracking-wide">{hallway.building || "Rakennus"}</div>
+              <div style={{ fontSize: 14 }} className="opacity-70 -mt-1">{hallway.name}</div>
+            </div>
+          </div>
+          <div className={cn("mt-4", hallway.infoEnabled ? "flex gap-8" : "")}> 
+            <div className={cn(hallway.infoEnabled ? "w-1/2" : "w-full")}> 
+        <div className="flex flex-col gap-6">
+        {floorsAsc.map((floor) => (
+              <div key={floor.id} className="mb-6">
+                <div className="text-xl font-semibold uppercase mb-3">{floor.level}. KERROS</div>
+                <div className="flex flex-col gap-3">
+                  {floor.apartments.map((apt) => (
+                    <div key={apt.id} className="grid grid-cols-[60px_1fr] gap-x-6">
+                      <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
+                      <div className="text-sm font-semibold break-words whitespace-normal">
+                        {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
+                          <span className="opacity-40">(tyhj‰)</span>
+                        )}
+                      </div>
+                      {apt.tenants
+                        .filter((t) => t.surname.trim())
+                        .slice(1)
+                        .map((t, idx) => (
+                          <React.Fragment key={idx}>
+                            <div></div>
+                            <div className="text-sm font-semibold break-words whitespace-normal">{t.surname.toUpperCase()}</div>
+                          </React.Fragment>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+          </div>
+
+          {hallway.infoEnabled && (
+            <div className="w-1/2 p-4">
+              <div className="border-l border-white/30 pl-6 h-full">
+                <div className="uppercase tracking-wide font-semibold mb-3 opacity-80">Info</div>
+                <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
+
+      <div ref={footerRef} className="absolute left-0 right-0 bottom-0 text-center text-[10px] opacity-60 pb-1">
+        Esikatselu
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

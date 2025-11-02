@@ -4,3 +4,48 @@
 @tailwind utilities;
 
 .scroll-area { overflow: auto; }
+
+/* Unify font across app, preview, and static blob */
+html, body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+}
+
+/* Slate editor + preview Info content styles */
+.slate-editable h1, .info-content h1 {
+  font-size: 250%;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0.4em 0 0.3em;
+}
+.slate-editable h2, .info-content h2 {
+  font-size: 180%;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.4em 0 0.2em;
+}
+.slate-editable p, .info-content p { margin: 0.4em 0; }
+.slate-editable blockquote, .info-content blockquote {
+  border-left: 4px solid rgba(0,0,0,0.2);
+  margin: 0.6em 0;
+  padding-left: 12px;
+}
+.slate-editable ul,
+.slate-editable ol,
+.info-content ul,
+.info-content ol {
+  margin: 0.4em 0 0.6em 1.3em;
+}
+.slate-editable ul, .info-content ul { list-style: disc; }
+.slate-editable ol, .info-content ol { list-style: decimal; }
+
+/* Preserve empty lines in info content */
+.info-content p:empty::before {
+  content: "\00a0";
+  display: inline-block;
+}
+
+/* Ensure any ARIA tablist spans full width so following content wraps below */
+[role="tablist"] {
+  display: block;
+  width: 100%;
+}

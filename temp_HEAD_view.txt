@@ -1,7 +1,7 @@
-Ôªøimport React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils"; // jos projektissa ei ole t√§t√§, voit korvata paikallisella apurilla (kommentti alla)
+import { cn } from "@/lib/utils"; // jos projektissa ei ole t‰t‰, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,18 +9,15 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import SlateEditor from "./components/SlateEditor";
-import WeatherClock from "./components/WeatherClock";
-import { FI_MUNICIPALITIES } from "./data/fi-municipalities";
 
-// Varmuuden vuoksi: jos cn puuttuu projektistasi, kommentoi yll√§ oleva import ja k√§yt√§ t√§t√§:
+// Varmuuden vuoksi: jos cn puuttuu projektistasi, kommentoi yll‰ oleva import ja k‰yt‰ t‰t‰:
 // const cn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
- * Asukasn√§ytt√∂ - hallinta + TV-esikatselu
- * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettyn√§ kun esikatselu pois p√§√§lt√§)
- * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yritt√§√§ tallettaa sen /api/ruutu -p√§√§h√§n
- * - K√§ynnistyspromptti: hae talletettu n√§kym√§ sarjanumerolla tai aloita tyhj√§st√§
+ * Asukasn‰yttˆ - hallinta + TV-esikatselu
+ * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettyn‰ kun esikatselu pois p‰‰lt‰)
+ * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yritt‰‰ tallettaa sen /api/ruutu -p‰‰h‰n
+ * - K‰ynnistyspromptti: hae talletettu n‰kym‰ sarjanumerolla tai aloita tyhj‰st‰
  */
 
 // ---------- Tyypit ----------
@@ -28,33 +25,23 @@ export type Tenant = { id: string; surname: string };
 export type Apartment = {
   id: string;
   number: string; // esim. "101"
-  tenants: Tenant[]; // 1-2 sukunime√§
+  tenants: Tenant[]; // 1-2 sukunime‰
 };
 export type Floor = {
   id: string;
   label: string; // esim. "Kerros 3"
-  level: number; // numeerinen j√§rjestysavain
+  level: number; // numeerinen j‰rjestysavain
   apartments: Apartment[];
 };
 export type Orientation = "portrait" | "landscape";
 export type Hallway = {
   id: string;
-  name: string; // esim. "Porrask√§yt√§v√§ B it√§siipi"
+  name: string; // esim. "Porrask‰yt‰v‰ B it‰siipi"
   building?: string;
   isActive: boolean;
   orientation?: Orientation; // pysty (1080x1920) tai vaaka (1920x1080)
   serial?: string; // laitteen sarjanumero
   scale?: number;
-  // Weather and clock settings
-  weatherCity?: string;
-  weatherLat?: number;
-  weatherLon?: number;
-  clockMode?: "auto" | "manual";
-  clockDate?: string; // YYYY-MM-DD
-  clockTime?: string; // HH:MM
-  // Info panel
-  infoEnabled?: boolean;
-  infoHtml?: string;
   floors: Floor[]; // lajiteltu level:n mukaan
 };
 
@@ -63,20 +50,12 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const apartmentPlaceholder = (level: number, idx: number) => `${level * 100 + idx + 1}`;
 const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   id: partial?.id || "demo-hallway",
-  name: partial?.name || "K√§yt√§v√§ A",
+  name: partial?.name || "K‰yt‰v‰ A",
   building: partial?.building || "",
   isActive: partial?.isActive ?? true,
   orientation: partial?.orientation || "landscape",
   serial: partial?.serial || "",
   scale: partial?.scale ?? 1,
-  weatherCity: partial?.weatherCity || "",
-  weatherLat: partial?.weatherLat,
-  weatherLon: partial?.weatherLon,
-  clockMode: partial?.clockMode || "auto",
-  clockDate: partial?.clockDate,
-  clockTime: partial?.clockTime,
-  infoEnabled: partial?.infoEnabled ?? false,
-  infoHtml: partial?.infoHtml || "",
   floors: partial?.floors || [],
 });
 
@@ -98,7 +77,7 @@ function computeLandscapeCounts(n: number): number[] {
     12: [3, 3, 3, 3],
   };
   if (map[n]) return map[n];
-  // Fallback > 12: t√§yt√§ 3/kolumni ja lis√§√§ uusi kolumni tarvittaessa
+  // Fallback > 12: t‰yt‰ 3/kolumni ja lis‰‰ uusi kolumni tarvittaessa
   const base = 3;
   const minCols = 4;
   const cols = Math.ceil((n - 12) / base) + minCols;
@@ -140,7 +119,7 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
   let idx = 0;
   for (let c = 0; c < counts.length; c++) {
     const take = counts[c];
-    out.push(items.slice(idx, idx + take).reverse()); // n√§yt√§ alhaalta yl√§s
+    out.push(items.slice(idx, idx + take).reverse()); // n‰yt‰ alhaalta yl‰s
     idx += take;
   }
   return out;
@@ -149,9 +128,9 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
 // Polku ruudun julkaisuihin
 const RUUTU_DIR = "ruutu";
 
-// ---------- Backend-API:t (sovita omaan ymp√§rist√§√§n) ----------
+// ---------- Backend-API:t (sovita omaan ymp‰rist‰‰n) ----------
 async function fetchHallway(hallwayId: string): Promise<Hallway> {
-  // T√§ss√§ demossa palautetaan tyhj√§, jotta appi k√§ynnistyy ilman backendia
+  // T‰ss‰ demossa palautetaan tyhj‰, jotta appi k‰ynnistyy ilman backendia
   return emptyHallway({ id: hallwayId });
 }
 
@@ -181,48 +160,9 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function sanitizeInfoHtml(html: string): string {
-  try {
-    return String(html || "")
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/ on[a-z]+\s*=\s*"[^"]*"/gi, "")
-      .replace(/ on[a-z]+\s*=\s*'[^']*'/gi, "")
-      .replace(/javascript:/gi, "");
-  } catch { return ""; }
-}
-
 function buildStaticTvHtml(h: Hallway): string {
   const orientation: Orientation = h.orientation || "landscape";
-  const floorsAsc = [...h.floors].sort((a, b) => b.level - a.level);
-  const floorsHtml = floorsAsc
-    .map((floor) => {
-      const apartmentsHtml = floor.apartments
-        .map((apt) => {
-          const tenants = (apt.tenants || [])
-            .filter((t) => t && t.surname && t.surname.trim().length > 0)
-            .map((t) => escapeHtml(t.surname.toUpperCase()));
-          const first = tenants[0] || '<span class="empty">(tyhj√§)</span>';
-          const rest = tenants.slice(1).map((n) => `<div class=\"apt-name\">${n}</div>`).join("");
-          const numberHtml = escapeHtml(apt.number || "-");
-          return (
-            `<div class=\"apt-row\">` +
-            `<div class=\"apt-num\">${numberHtml}</div>` +
-            `<div class=\"apt-names\">` +
-            `<div class=\"apt-name\">${first}</div>` +
-            `${rest}` +
-            `</div>` +
-            `</div>`
-          );
-        })
-        .join("");
-      return (
-        `<div class=\"floor\">` +
-        `<div class=\"floor-title\">${escapeHtml(String(floor.level))}. KERROS</div>` +
-        `<div class=\"apt-list\">${apartmentsHtml}</div>` +
-        `</div>`
-      );
-    })
-    .join("");
+  const floorsAsc = [...h.floors].sort((a, b) => a.level - b.level);
   const cols = buildColumnsShared(floorsAsc, orientation);
 
   const columnsHtml = cols
@@ -234,7 +174,7 @@ function buildStaticTvHtml(h: Hallway): string {
               const tenants = (apt.tenants || [])
                 .filter((t) => t && t.surname && t.surname.trim().length > 0)
                 .map((t) => escapeHtml(t.surname.toUpperCase()));
-              const first = tenants[0] || '<span class="empty">(tyhj√§)</span>';
+              const first = tenants[0] || '<span class="empty">(tyhj‰)</span>';
               const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
               const numberHtml = escapeHtml(apt.number || "-");
               return (
@@ -256,29 +196,19 @@ function buildStaticTvHtml(h: Hallway): string {
           );
         })
         .join("");
-      return `<div class="col"><div class="vcenter inner-pad">${floorsHtml}</div></div>`;
+      return `<div class="col">${floorsHtml}</div>`;
     })
     .join("");
 
-  const baseW = orientation === "portrait" ? 1080 : 1920;
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
-#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:4em}
+#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px}
 #brand .title{font-size:28px;font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:14px}
-#clock{display:flex;align-items:center;gap:16px}
-#clock .time{font-size:28px;font-weight:600}
-#clock .date{font-size:12px;opacity:.7}
-#clock .temps{font-size:14px;line-height:1.1}
-#clock .icon{width:32px;height:32px}
 #content{position:relative;padding:20px;transform-origin:top left}
-.cols{display:flex;gap:32px;align-items:stretch}
-.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
-.col > .vcenter{margin:auto 0}
-.inner-pad{padding-left:10%;padding-right:10%}
-.cols-1 .col{flex-basis:100%}
-.cols-2 .col{flex-basis:50%}
+.cols{display:flex;gap:32px}
+.col{flex:1;min-width:0}
 .floor{margin-bottom:24px}
 .floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:22px}
 .apt-row{display:flex;gap:24px;margin:6px 0}
@@ -287,11 +217,9 @@ function buildStaticTvHtml(h: Hallway): string {
 .apt-name{font-weight:700;font-size:14px;line-height:1.1}
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
-.info-content p:empty::before{content:'\\00a0';display:inline-block}
 `;
 
   const jsonEmbedded = JSON.stringify(h).replace(/</g, "\\u003c");
-  const infoHtml = (h.infoEnabled && (h.infoHtml || "").trim()) ? sanitizeInfoHtml(h.infoHtml || "") : "";
   const html = `<!doctype html>
 <html lang="fi">
 <head>
@@ -313,26 +241,10 @@ function buildStaticTvHtml(h: Hallway): string {
         <div class="title">${escapeHtml(h.building || "Rakennus")}</div>
         <div class="subtitle">${escapeHtml(h.name)}</div>
       </div>
-      <div id="clock" aria-label="Aika, p√§iv√§m√§√§r√§ ja s√§√§">
-        <div class="td">
-          <div id="time" class="time">--.--</div>
-          <div id="date" class="date">--.--.----</div>
-        </div>
-        <div id="wxicon" class="icon" aria-hidden="true"></div>
-        <div class="temps">
-          <div id="tmax">‚Äì ¬∞C</div>
-          <div id="tmin" class="min">‚Äì ¬∞C</div>
-        </div>
-      </div>
     </div>
-    <div id="content" style="width:${'${'}baseW${'}'}px">
-      <div class="cols ${infoHtml ? 'cols-2' : 'cols-1'}">
-        <div class="col col-main">
-          <div class="inner-pad">
-            ${floorsHtml}
-          </div>
-        </div>
-        ${infoHtml ? `<div class="col col-info"><div class="inner-pad"><div class="info-content">${infoHtml}</div></div></div>` : ``}
+    <div id="content">
+      <div class="cols cols-${cols.length}">
+        ${columnsHtml}
       </div>
     </div>
     <div id="footer"></div>
@@ -340,12 +252,6 @@ function buildStaticTvHtml(h: Hallway): string {
   
 <script>(function(){
   var USER_SCALE = ${Number(h.scale ?? 1)};
-  var CLOCK_MODE = ${JSON.stringify(h.clockMode || "auto")};
-  var CLOCK_DATE = ${JSON.stringify(h.clockDate || "")};
-  var CLOCK_TIME = ${JSON.stringify(h.clockTime || "")};
-  var CITY = ${JSON.stringify(h.weatherCity || "")};
-  var LAT = ${typeof h.weatherLat === 'number' ? h.weatherLat : 'null'};
-  var LON = ${typeof h.weatherLon === 'number' ? h.weatherLon : 'null'};
   function fit(){
     var C=document.getElementById('container');
     var H=document.getElementById('header');
@@ -360,77 +266,9 @@ function buildStaticTvHtml(h: Hallway): string {
     G.style.transform='scale('+s+')';
     G.style.transformOrigin='top left';
   }
-  function getNow(){
-    if(CLOCK_MODE==='manual' && CLOCK_DATE && CLOCK_TIME){
-      var d=new Date(CLOCK_DATE+'T'+CLOCK_TIME);
-      if(!isNaN(d.getTime())) return d;
-    }
-    return new Date();
-  }
-  function pad2(n){return (n<10?'0':'')+n}
-  function updateClock(){
-    var d=getNow();
-    var hh=pad2(d.getHours()); var mm=pad2(d.getMinutes());
-    var t=hh+'.'+mm;
-    var ds=pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.'+d.getFullYear();
-    var te=document.getElementById('time'); var de=document.getElementById('date');
-    if(te) te.textContent=t;
-    if(de) de.textContent=ds;
-  }
-  function setTemps(tmax,tmin){
-    var a=document.getElementById('tmax'); var b=document.getElementById('tmin');
-    if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '‚Äì') + ' ¬∞C';
-    if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '‚Äì') + ' ¬∞C';
-  }
-  function iconFor(code){
-    // Minimal inline SVG icons to avoid external deps
-    var sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>';
-    var cloud = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 18Z" fill="currentColor"/></svg>';
-    var rain = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 14Z" fill="currentColor"/><path d="M8 16l-1 3M12 16l-1 3M16 16l-1 3"/></svg>';
-    var snow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32" stroke-linecap="round"><path d="M12 4v16M7 7l10 10M17 7L7 17"/></svg>';
-    var fog = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M3 16h18M5 19h14"/></svg>';
-    var thunder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32" stroke-linejoin="round"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M13 13l-3 6h3l-1 4 4-7h-3l1-3z"/></svg>';
-    if(code==null) return cloud;
-    if(code===0) return sun;
-    if([1,2,3].includes(code)) return cloud;
-    if([45,48].includes(code)) return fog;
-    if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return rain;
-    if([71,73,75,77,85,86].includes(code)) return snow;
-    if([95,96,99].includes(code)) return thunder;
-    return cloud;
-  }
-  async function resolveCoords(){
-    if(typeof LAT==='number' && typeof LON==='number') return {lat:LAT, lon:LON};
-    if(CITY){
-      try{
-        var u=new URL('https://geocoding-api.open-meteo.com/v1/search');
-        u.searchParams.set('name', CITY); u.searchParams.set('count','1'); u.searchParams.set('language','fi'); u.searchParams.set('format','json');
-        var r=await fetch(u.toString(), {cache:'no-store'});
-        if(r.ok){ var j=await r.json(); var g=j&&j.results&&j.results[0]; if(g) return {lat:g.latitude, lon:g.longitude}; }
-      }catch(e){}
-    }
-    // Default to Helsinki if nothing set
-    return { lat: 60.1699, lon: 24.9384 };
-  }
-  async function loadWeather(){
-    try{
-      var c = await resolveCoords();
-      if(!c) { setTemps(NaN, NaN); return; }
-      var w = new URL('https://api.open-meteo.com/v1/forecast');
-      w.searchParams.set('latitude', String(c.lat)); w.searchParams.set('longitude', String(c.lon));
-      w.searchParams.set('daily','temperature_2m_max,temperature_2m_min,weathercode'); w.searchParams.set('timezone','auto');
-      var res = await fetch(w.toString(), {cache:'no-store'});
-      if(!res.ok) throw new Error('weather');
-      var d = await res.json();
-      var i=0; var tMax = d&&d.daily&&d.daily.temperature_2m_max? d.daily.temperature_2m_max[i]: null; var tMin = d&&d.daily&&d.daily.temperature_2m_min? d.daily.temperature_2m_min[i]: null; var code = d&&d.daily&&d.daily.weathercode? d.daily.weathercode[i]: null;
-      setTemps(tMax, tMin);
-      var ic=document.getElementById('wxicon'); if(ic) ic.innerHTML = iconFor(code);
-    }catch(e){ setTemps(NaN, NaN); }
-  }
   window.addEventListener('resize', fit);
   document.addEventListener('DOMContentLoaded', fit);
   setTimeout(fit, 50);
-  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); });
 })();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
 </body>
@@ -465,7 +303,7 @@ function parseHallwayFromStaticHtml(html: string): Hallway | null {
   }
 }
 
-// P√§√§te-tiedostonimi (sarjanumero etusijalla)
+// P‰‰te-tiedostonimi (sarjanumero etusijalla)
 function staticFilenameFor(h: Hallway): string {
   const serial = (h.serial || "").trim();
   if (serial) return `${serial}.html`;
@@ -481,14 +319,13 @@ function openStaticPreviewTab(h: Hallway) {
     if (win && typeof win.focus === "function") win.focus();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   } catch (e) {
-    console.error("Esikatselun avaaminen ep√§onnistui", e);
+    console.error("Esikatselun avaaminen ep‰onnistui", e);
   }
 }
 
-// ---------- P√§√§komponentti ----------
+// ---------- P‰‰komponentti ----------
 export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
   const [hallway, setHallway] = useState<Hallway>(emptyHallway());
-  const [activeTab, setActiveTab] = useState<"hallinta" | "saa" | "info">("hallinta");
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -497,7 +334,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [serverSaveWarning, setServerSaveWarning] = useState<string>("");
 
-  // K√§ynnistyspromptti
+  // K‰ynnistyspromptti
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
   const [startupSerial, setStartupSerial] = useState<string>("");
   const [startupError, setStartupError] = useState<string>("");
@@ -512,7 +349,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         setLoading(true);
         const data = await fetchHallway(hallwayId).catch(() => emptyHallway());
         if (!mounted) return;
-        // Esimerkkidata tyhj√§√§n n√§kym√§√§n
+        // Esimerkkidata tyhj‰‰n n‰kym‰‰n
         if (!data.floors.length) {
           const f1: Floor = { id: uid(), label: "Kerros 1", level: 1, apartments: [] };
           const f2: Floor = { id: uid(), label: "Kerros 2", level: 2, apartments: [] };
@@ -601,7 +438,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
   const sortedFloors = useMemo(() => [...hallway.floors].sort((a, b) => b.level - a.level), [hallway.floors]);
 
-  // Jos URLissa on ?serial=ABC, yrit√§ hakea talletettu n√§kym√§ automaattisesti adminissa
+  // Jos URLissa on ?serial=ABC, yrit‰ hakea talletettu n‰kym‰ automaattisesti adminissa
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('serial');
     if (s) {
@@ -611,42 +448,42 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         try {
           setStartupError("");
           const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: 'no-store' });
-          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.'); return; }
+          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.'); return; }
           const text = await res.text();
           const data = parseHallwayFromStaticHtml(text);
-          if (!data) { setStartupError('Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.'); return; }
+          if (!data) { setStartupError('Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.'); return; }
           setHallway({ ...emptyHallway(), ...data, serial });
           setShowStartupPrompt(false);
         } catch {
-          setStartupError('Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.');
+          setStartupError('Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.');
         }
       })();
     }
   }, []);
-  // K√§ynnistyspromptin toiminnot
+  // K‰ynnistyspromptin toiminnot
   const handleStartupFetch = async () => {
     const serial = startupSerial.trim().toUpperCase();
     if (!serial) {
-      setStartupError("Sy√§t√§ sarjanumero.");
+      setStartupError("Sy‰t‰ sarjanumero.");
       return;
     }
     try {
       setStartupError("");
       const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
       if (!res.ok) {
-        setStartupError("Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.");
+        setStartupError("Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.");
         return;
       }
       const text = await res.text();
       const data = parseHallwayFromStaticHtml(text);
       if (!data) {
-        setStartupError("Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.");
+        setStartupError("Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.");
         return;
       }
       setHallway({ ...emptyHallway(), ...data, serial });
       setShowStartupPrompt(false);
     } catch (e) {
-      setStartupError("Antamallasi sarjanumerolla ei l√§ydy tallennettua n√§ytt√§√§.");
+      setStartupError("Antamallasi sarjanumerolla ei l‰ydy tallennettua n‰ytt‰‰.");
     }
   };
   const handleCreateNew = () => {
@@ -658,7 +495,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const handleSave = async () => {
     const serial = hallway.serial?.trim();
     if (!serial) {
-      setError("Sy√§t√§ laitteen sarjanumero ennen tallennusta.");
+      setError("Sy‰t‰ laitteen sarjanumero ennen tallennusta.");
       return;
     }
     try {
@@ -671,8 +508,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       const saveRes = await saveRuutu(hallway, html, fname);
       if (!saveRes.ok) {
         setServerSaveWarning(
-          `Palvelintallennus ep√§onnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
-            `Loin ja latasin HTML:n paikallisesti - muista siirt√§√§ tiedosto palvelimelle polkuun ${relPath} jotta TV l√§yt√§√§ sen.`
+          `Palvelintallennus ep‰onnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
+            `Loin ja latasin HTML:n paikallisesti - muista siirt‰‰ tiedosto palvelimelle polkuun ${relPath} jotta TV l‰yt‰‰ sen.`
         );
       } else {
         setServerSaveWarning("");
@@ -686,7 +523,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       setTimeout(() => setStatus(""), 3000);
     } catch (e: any) {
       setStatus("");
-      setError(e?.message || "Tallennus ep√§onnistui");
+      setError(e?.message || "Tallennus ep‰onnistui");
     }
   };
 
@@ -709,7 +546,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
     // Palauta ja tarkista JSON-upotus
     const restored = parseHallwayFromStaticHtml(html);
-    console.assert(!!restored && typeof restored === "object", "Upotetun JSON:n palautus ep√§onnistui");
+    console.assert(!!restored && typeof restored === "object", "Upotetun JSON:n palautus ep‰onnistui");
   }, [hallway]);
 
   if (loading) {
@@ -720,10 +557,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     <div
       className={cn(
         "p-4 lg:p-8 bg-[#dedede]",
-        showPreview ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "flex flex-col items-center gap-6"
+        showPreview ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "flex justify-center"
       )}
     >
-      {/* K√§ynnistyspromptti (overlay) */}
+      {/* K‰ynnistyspromptti (overlay) */}
       {showStartupPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white text-black p-6 shadow-2xl">
@@ -739,53 +576,27 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               </div>
               <div className="h-px bg-[#aaaaaa]" />
               <div className="flex items-center justify-between">
-                <div className="text-sm opacity-80">Aloita tyhj√§st√§ n√§kym√§st√§..</div>
+                <div className="text-sm opacity-80">Aloita tyhj‰st‰ n‰kym‰st‰..</div>
                 <Button type="button" variant="secondary" onClick={handleCreateNew}>Luo uusi</Button>
               </div>
             </div>
           </div>
         </div>
       )}
-      {/* Top header: brand + tabs + save */}
-      <div className="mb-4 border-b col-span-full w-full">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xl font-semibold">Infovisio</div>
-          <div role="tablist" className="flex gap-3">
-            <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Hallinta</button>
-            <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
-            <button role="tab" aria-selected={activeTab === "saa"} onClick={() => setActiveTab("saa")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "saa" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>S√§√§ + aika</button>
-          </div>
-          <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
-        </div>
-      </div>
+
       {/* Editori (kolumni 1) */}
       <div className={cn(showPreview ? "" : "w-full max-w-4xl")}>        
         <Card className="shadow-lg">
           <CardHeader className="flex items-center justify-between gap-2">
             <div className="space-y-1">
-              {activeTab === 'hallinta' && (
-                <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasn√§ytt√∂ - hallinta</CardTitle>
-                  <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimi√§. Muutokset n√§kyv√§t oikealla esikatselussa.</p>
-                </>
-              )}
-              {activeTab === 'saa' && (
-                <>
-                  <CardTitle className="text-xl flex items-center gap-2"><MonitorPlay className="h-5 w-5"/>Asukasn√§ytt√∂ - S√§√§ + aika</CardTitle>
-                  <p className="text-sm opacity-70">M√§√§rit√§ ruudulla n√§kyv√§ s√§√§ paikkakunnan mukaan. Voit k√§ytt√§√§ my√∂s automaattista tai manuaalista aikaa ja p√§iv√§m√§√§r√§√§.</p>
-                </>
-              )}
-              {activeTab === 'info' && (
-                <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasn√§ytt√∂ - Info</CardTitle>
-                  <p className="text-sm opacity-70">Jos haluat tiedottaa yleis√∂lle jotain, voit tehd√§ sen ottamalla infoalue k√§ytt√∂√∂n ja sy√∂tt√§m√§ll√§ teksti√§ ja antamalla sille haluamasi tyylit.</p>
-                </>
-              )}
+              <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasn‰yttˆ - hallinta</CardTitle>
+              <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimi‰. Muutokset n‰kyv‰t oikealla esikatselussa.</p>
             </div>
+            <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="ml-auto rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
             <div className="hidden items-center gap-3">
-              {/* N√§yt√∂n suunta */}
+              {/* N‰ytˆn suunta */}
               <div className="flex items-center gap-2">
-                <Label htmlFor="orientation" className="text-sm">N√§yt√∂n suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">N‰ytˆn suunta</Label>
                 <select
                   id="orientation"
                   value={hallway.orientation || "landscape"}
@@ -804,8 +615,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             </div>
           </CardHeader>
           <CardContent>
-            {activeTab === "hallinta" && (
-            <>
             {/* Sarjanumero */}
             <div className="mb-3 flex items-center gap-4 justify-end">
               <div className="flex items-center gap-2">
@@ -814,7 +623,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
                 <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
               </div>
-                <Label htmlFor="orientation" className="text-sm">N√§yt√∂n suunta</Label>
+                <Label htmlFor="orientation" className="text-sm">N‰ytˆn suunta</Label>
                 <select id="orientation" value={hallway.orientation || "landscape"} onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))} className="h-9 px-2 rounded-md border bg-white text-black">
                   <option value="portrait">Pysty</option>
                   <option value="landscape">Vaaka</option>
@@ -846,8 +655,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div>
-                <Label htmlFor="hallway-name">K√§yt√§v√§n nimi</Label>
-                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porrask√§yt√§v√§ B - it√§siipi" />
+                <Label htmlFor="hallway-name">K‰yt‰v‰n nimi</Label>
+                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porrask‰yt‰v‰ B - it‰siipi" />
               </div>
               <div>
                 <Label htmlFor="building-name">Rakennus</Label>
@@ -857,7 +666,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
-              <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis√§√§ kerros</Button>
+              <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis‰‰ kerros</Button>
             </div>
 
             <ScrollArea className="h-[60vh] pr-2">
@@ -871,14 +680,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder="Kerros 3" />
                       </div>
                       <div className="col-span-12 md:col-span-6">
-                        <Label>Taso (j√§rjestys)</Label>
+                        <Label>Taso (j‰rjestys)</Label>
                         <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
                       </div>
 
                       <div className="col-span-12">
                         <div className="flex items-center justify-between mt-4">
                           <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
-                          <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis√§√§ asunto</Button>
+                          <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis‰‰ asunto</Button>
                         </div>
 
                         <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -905,10 +714,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                                       onClick={() => addTenant(floor.id, apt.id)}
                                       disabled={apt.tenants.length >= 2}
                                       className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
-                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime√§" : undefined}
+                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime‰" : undefined}
                                     >
                                       <Plus className="h-4 w-4 mr-1"/>
-                                      Lis√§√§ sukunimi
+                                      Lis‰‰ sukunimi
                                     </Button>
                                   </div>
 
@@ -935,91 +744,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 ))}
               </div>
             </ScrollArea>
-            </>
-            )}
-
-            {activeTab === "saa" && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Label>Kaupunki</Label>
-                    <Input
-                      value={hallway.weatherCity || ""}
-                      onChange={(e) => setHallway(h => ({ ...h, weatherCity: e.target.value }))}
-                      placeholder="esim. Helsinki"
-                      aria-autocomplete="list"
-                      aria-expanded={(hallway.weatherCity || "").trim().length >= 2 ? true : false}
-                      aria-controls="city-suggest"
-                    />
-                    {((hallway.weatherCity || "").trim().length >= 2) && (
-                      <div id="city-suggest" role="listbox" className="absolute z-20 mt-1 w-full rounded-md border bg-white text-black shadow">
-                        {FI_MUNICIPALITIES
-                          .filter((n) => n.toLowerCase().includes((hallway.weatherCity || "").trim().toLowerCase()))
-                          .slice(0, 8)
-                          .map((name) => (
-                            <button
-                              key={name}
-                              type="button"
-                              role="option"
-                              onClick={() => setHallway(h => ({ ...h, weatherCity: name }))}
-                              className="block w-full text-left px-3 py-1.5 hover:bg-zinc-100"
-                            >
-                              {name}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                    <div className="mt-1 text-xs text-zinc-600">
-                      {((hallway.weatherCity || "").trim())
-                        ? <>N√§ytet√§√§n: <span className="font-medium">{hallway.weatherCity}</span></>
-                        : <>Ei asetettu ‚Äî k√§ytet√§√§n automaattista paikannusta tai oletuksena Helsingin s√§√§t√§.</>
-                      }
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <div className="font-medium mb-2">Ajan asetus</div>
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="clockmode" checked={(hallway.clockMode || "auto") === "auto"} onChange={() => setHallway(h => ({ ...h, clockMode: "auto" }))} />
-                      <span>Automaattinen</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="radio" name="clockmode" checked={hallway.clockMode === "manual"} onChange={() => setHallway(h => ({ ...h, clockMode: "manual" }))} />
-                      <span>Manuaalinen</span>
-                    </label>
-                  </div>
-                  {hallway.clockMode === "manual" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <Label>P√§iv√§m√§√§r√§</Label>
-                        <Input type="date" value={hallway.clockDate || ""} onChange={(e) => setHallway((h) => ({ ...h, clockDate: e.target.value }))} />
-                      </div>
-                      <div>
-                        <Label>Kellonaika</Label>
-                        <Input type="time" step={60} value={hallway.clockTime || ""} onChange={(e) => setHallway((h) => ({ ...h, clockTime: e.target.value }))} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="h-px bg-[#aaaaaa]" />
-                <div className="text-sm opacity-70">N√§m√§ asetukset vaikuttavat esikatseluun ja TV:lle tallennettavaan HTML:√§√§n.</div>
-              </div>
-            )}
-
-            {activeTab === "info" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="info-enabled">K√§yt√∂ss√§</Label>
-                  <Switch id="info-enabled" checked={!!hallway.infoEnabled} onCheckedChange={(v) => setHallway((h) => ({ ...h, infoEnabled: v }))} />
-                </div>
-                <div>
-                  <Label>Sis√§lt√∂</Label>
-                  <SlateEditor value={hallway.infoHtml || ""} onChange={(html: string) => setHallway((h) => ({ ...h, infoHtml: html }))} />
-                  <div className="text-sm opacity-60 mt-1">Tallennetaan osaksi TV-n√§kym√§√§. Skriptit ja tapahtumat poistetaan automaattisesti.</div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -1035,7 +759,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 {hallway.orientation === "portrait" ? "Pysty" : "Vaaka"}
               </span>
             </CardTitle>
-            <button aria-label="Avaa uuteen v√§lilehteen" title="Avaa uuteen v√§lilehteen" onClick={() => openStaticPreviewTab(hallway)} className="ml-auto inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
+            <button aria-label="Avaa uuteen v‰lilehteen" title="Avaa uuteen v‰lilehteen" onClick={() => openStaticPreviewTab(hallway)} className="ml-auto inline-flex items-center justify-center rounded-md p-2 hover:bg-zinc-100 text-zinc-700">
               <ExternalLink className="h-4 w-4" />
             </button>
           </CardHeader>
@@ -1052,7 +776,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <DialogTitle>Tallennus onnistui</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p>N√§kym√§ tallennettu. TV hakee sen omalla sarjanumerollaan.</p>
+            <p>N‰kym‰ tallennettu. TV hakee sen omalla sarjanumerollaan.</p>
             <div className="text-sm">Absoluuttinen URL:</div>
             <div className="flex gap-2">
               <Input readOnly value={savedUrl || ""} />
@@ -1071,44 +795,69 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 // ---------- TV-esikatselun komponentti ----------
 function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const orientation: Orientation = hallway.orientation || "landscape";
-  const floorsAsc = useMemo(() => [...hallway.floors].sort((a, b) => b.level - a.level), [hallway.floors]);
+  const floorsAsc = useMemo(() => [...hallway.floors].sort((a, b) => a.level - b.level), [hallway.floors]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
-  const scaleRootRef = useRef<HTMLDivElement>(null);
   const [gridScale, setGridScale] = useState(1);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const lastLandscapeRef = useRef<{ w: number; h: number } | null>(null);
   const [scaleHint, setScaleHint] = useState(1);
+  const [numCols, setNumCols] = useState<number>(orientation === "portrait" ? 2 : 3);
 
-  // No column count verification anymore; we always render a single list column
+  const buildColumns = (items: Floor[]): Floor[][] => buildColumnsShared(items, orientation);
+  const [columns, setColumns] = useState<Floor[][]>(buildColumns(floorsAsc));
 
-  // Laske esikatselulaatikon koko niin, ett√§ pysty = vaaka k√§√§nteisen√§
+  useEffect(() => {
+    const expectedLandscape: Record<number, number[]> = {
+      1: [1], 2: [1, 1], 3: [2, 1], 4: [2, 2], 5: [2, 2, 1], 6: [2, 2, 2], 7: [2, 2, 2, 1], 8: [2, 2, 2, 2], 9: [3, 2, 2, 2], 10: [3, 3, 2, 2], 11: [3, 3, 3, 2], 12: [3, 3, 3, 3],
+    };
+    const expectedPortrait: Record<number, number[]> = {
+      1: [1], 2: [2], 3: [3], 4: [4], 5: [3, 2], 6: [3, 3], 7: [4, 3], 8: [4, 4], 9: [5, 4], 10: [5, 5], 11: [6, 5], 12: [6, 6], 13: [5, 5, 3], 14: [5, 5, 4], 15: [5, 5, 5],
+    };
+    const check = (n: number, got: number[], want?: number[]) => {
+      if (want && want.length && got.join(",") !== want.join(",")) {
+        console.warn("Sarakejako ei vastaa odotusta", { orientation, n, got, want });
+      }
+    };
+    for (let n = 1; n <= 12; n++) check(n, computeLandscapeCounts(n), expectedLandscape[n]);
+    for (let n = 1; n <= 15; n++) check(n, computePortraitCounts(n), expectedPortrait[n]);
+  }, [orientation]);
+
+  // Laske esikatselulaatikon koko niin, ett‰ pysty = vaaka k‰‰nteisen‰
   useEffect(() => {
     const updateBox = () => {
       const el = containerRef.current;
       const parent = el?.parentElement as HTMLElement | null;
       if (!el || !parent) return;
 
+      // Respect element box-sizing. Tailwind sets border-box, where width/height include padding.
       const cs = getComputedStyle(el);
       const isBorderBox = (cs.boxSizing || "border-box").toLowerCase() === "border-box";
       const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
 
       const pw = parent.clientWidth;
+      const ph = parent.clientHeight;
+      // If border-box, we must NOT subtract padding from the target width/height we set.
       const maxW = isBorderBox ? pw : Math.max(0, pw - padX);
+      const maxH = isBorderBox ? ph : Math.max(0, ph - padY);
+
+      // Fit 16:9 rectangle inside available area, with a tiny safety margin.
       const safeW = Math.max(0, maxW - 1);
-      const wLandscape = safeW;
-      const hLandscape = (wLandscape * 9) / 16;
-      const w = orientation === "landscape" ? wLandscape : hLandscape;
-      const h = orientation === "landscape" ? hLandscape : wLandscape;
+      const safeH = Math.max(0, maxH - 1);
+      const widthL = Math.min(safeW, safeH * (16 / 9));
+      const heightL = (widthL * 9) / 16;
+      const w = orientation === "landscape" ? widthL : heightL;
+      const h = orientation === "landscape" ? heightL : widthL;
       if (orientation === "landscape") {
-        lastLandscapeRef.current = { w: wLandscape, h: hLandscape };
+        lastLandscapeRef.current = { w: widthL, h: heightL };
       } else if (lastLandscapeRef.current) {
         const prev = lastLandscapeRef.current;
         const near = (a: number, b: number) => Math.abs(a - b) <= 2;
-        console.assert(near(w, prev.h) && near(h, prev.w), "Pysty-koon pit√§isi olla vaakakoon k√§√§nteinen", { w, h, prev });
+        console.assert(near(w, prev.h) && near(h, prev.w), "Pysty-koon pit‰isi olla vaakakoon k‰‰nteinen", { w, h, prev });
       }
       setBoxSize({ w: Math.floor(w), h: Math.floor(h) });
     };
@@ -1122,7 +871,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     };
   }, [orientation]);
 
-  // Skaala + sarakem√§√§r√§
+  // Skaala + sarakem‰‰r‰
   useEffect(() => {
     const fitAndCols = () => {
       const C = containerRef.current;
@@ -1131,6 +880,10 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       const F = footerRef.current;
 
       const n = floorsAsc.length;
+      const countsNow = orientation === "landscape" ? computeLandscapeCounts(n) : computePortraitCounts(n);
+      const targetCols = Math.max(1, countsNow.length);
+      if (targetCols !== numCols) setNumCols(targetCols);
+
       const hint = orientation === "landscape" ? (n >= 10 ? 0.9 : n >= 7 ? 0.95 : 1) : 1;
       setScaleHint(hint);
 
@@ -1140,7 +893,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       const usedTop = H ? H.getBoundingClientRect().height : 0;
       const usedBottom = F ? F.getBoundingClientRect().height : 0;
       const availH = Math.max(0, ch - usedTop - usedBottom);
-      const s = Math.min(1, cw / G.scrollWidth, availH / G.scrollHeight);
+      const s = Math.min(1, availH / G.scrollHeight, cw / G.scrollWidth);
       setGridScale(Number.isFinite(s) && s > 0 ? s : 1);
     };
 
@@ -1154,7 +907,17 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       ro.disconnect();
       window.removeEventListener("resize", fitAndCols);
     };
-  }, [orientation, hallway, floorsAsc.length]);
+  }, [orientation, numCols, hallway, floorsAsc.length]);
+
+  useEffect(() => {
+    setColumns(buildColumns(floorsAsc));
+  }, [floorsAsc, orientation]);
+
+  useEffect(() => {
+    const total = floorsAsc.length;
+    const sum = columns.reduce((acc, c) => acc + c.length, 0);
+    if (sum !== total) console.warn("Sarakejako ei t‰sm‰‰ kerrosten lukum‰‰r‰‰n", { total, sum, numCols });
+  }, [floorsAsc, columns, numCols]);
 
   return (
     <div
@@ -1168,47 +931,40 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
         maxWidth: "100%",
         maxHeight: "100%",
       }}
-      className="bg-black text-white rounded-2xl overflow-hidden relative"
+      className="bg-black text-white rounded-2xl p-5 overflow-hidden relative"
     >
-      <div ref={gridRef} style={{ width: "100%", maxWidth: "100%", overflow: "hidden" }}>
-        <div
-          ref={scaleRootRef}
-          style={{
-            width: hallway.orientation === "portrait" ? 1080 : 1920,
-            transform: `scale(${(gridScale * scaleHint * (hallway.scale ?? 1)).toFixed(3)})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <div className="p-5">
-        <div className="flex items-start justify-between pt-5 px-5" style={{ marginBottom: '4em' }}>
+      <div
+        ref={gridRef}
+        style={{
+          transform: `scale(${(gridScale * scaleHint * (hallway.scale ?? 1)).toFixed(3)})`,
+          transformOrigin: "top left",
+        }}
+      >
+        <div className="flex items-start justify-between">
           <div>
             <div className="text-2xl font-semibold tracking-wide">{hallway.building || "Rakennus"}</div>
             <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
           </div>
-          <WeatherClock
-            tvStyle
-            city={hallway.weatherCity}
-            lat={hallway.weatherLat}
-            lon={hallway.weatherLon}
-            clockMode={hallway.clockMode}
-            manualDate={hallway.clockDate}
-            manualTime={hallway.clockTime}
-          />
         </div>
 
-        <div className="p-5 pt-4 flex gap-8 items-stretch">
-          <div className={cn((hallway.infoEnabled && (hallway.infoHtml || "").trim()) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
-            <div className="vcenter w-full" style={{ paddingLeft: '10%', paddingRight: '10%' }}>
-              {floorsAsc.map((floor) => (
-                <div key={floor.id} className="mb-6">
-                  <div className="text-xl font-semibold uppercase mb-3">{floor.level}. KERROS</div>
-                  <div className="flex flex-col gap-3">
+        <div
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(1, numCols)}, minmax(0, 1fr))`,
+          }}
+          className="mt-4 grid gap-8"
+        >
+        {columns.map((column, ci) => (
+          <div key={ci} className="p-2">
+            {column.map((floor) => (
+              <div key={floor.id} className="mb-6">
+                <div className="text-xl font-semibold uppercase mb-3">{floor.level}. KERROS</div>
+                <div className="flex flex-col gap-3">
                   {floor.apartments.map((apt) => (
                     <div key={apt.id} className="grid grid-cols-[60px_1fr] gap-x-6">
                       <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
                       <div className="text-sm font-semibold break-words whitespace-normal">
                         {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
-                          <span className="opacity-40">(tyhj√§)</span>
+                          <span className="opacity-40">(tyhj‰)</span>
                         )}
                       </div>
                       {apt.tenants
@@ -1225,18 +981,9 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                 </div>
               </div>
             ))}
-            </div>
           </div>
-          {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
-            <div className="basis-1/2 min-w-0 p-2">
-              <div style={{ paddingLeft: '10%', paddingRight: '10%' }}>
-                <div className="info-content" dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
-              </div>
-            </div>
-          )}
+        ))}
         </div>
-        </div>
-      </div>
       </div>
 
       <div ref={footerRef} className="absolute left-0 right-0 bottom-0 text-center text-[10px] opacity-60 pb-1">
@@ -1245,3 +992,17 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

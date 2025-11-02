@@ -1,0 +1,250 @@
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils"; // jos projektissa ei ole t‰t‰, voit korvata paikallisella apurilla (kommentti alla)
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import WeatherClock from "./components/WeatherClock";
+import SlateEditor from "./components/SlateEditor";
+
+// Varmuuden vuoksi: jos cn puuttuu projektistasi, kommentoi yll‰ oleva import ja k‰yt‰ t‰t‰:
+// const cn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
+
+/**
+ * Asukasn‰yttˆ - hallinta + TV-esikatselu
+ * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettyn‰ kun esikatselu pois p‰‰lt‰)
+ * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yritt‰‰ tallettaa sen /api/ruutu -p‰‰h‰n
+ * - K‰ynnistyspromptti: hae talletettu n‰kym‰ sarjanumerolla tai aloita tyhj‰st‰
+ */
+
+// ---------- Tyypit ----------
+export type Tenant = { id: string; surname: string };
+export type Apartment = {
+  id: string;
+  number: string; // esim. "101"
+  tenants: Tenant[]; // 1-2 sukunime‰
+};
+export type Floor = {
+  id: string;
+  label: string; // esim. "Kerros 3"
+  level: number; // numeerinen j‰rjestysavain
+  apartments: Apartment[];
+};
+export type Orientation = "portrait" | "landscape";
+export type Hallway = {
+  id: string;
+  name: string; // esim. "Porrask‰yt‰v‰ B it‰siipi"
+  building?: string;
+  isActive: boolean;
+  orientation?: Orientation; // pysty (1080x1920) tai vaaka (1920x1080)
+  serial?: string; // laitteen sarjanumero
+  scale?: number;
+  // Weather and clock settings
+  weatherCity?: string;
+  weatherLat?: number;
+  weatherLon?: number;
+  clockMode?: "auto" | "manual";
+  clockDate?: string; // YYYY-MM-DD
+  clockTime?: string; // HH:MM
+  // Info panel
+  infoEnabled?: boolean;
+  infoHtml?: string;
+  floors: Floor[]; // lajiteltu level:n mukaan
+};
+
+// ---------- Apuja ----------
+const uid = () => Math.random().toString(36).slice(2, 9);
+const apartmentPlaceholder = (level: number, idx: number) => `${level * 100 + idx + 1}`;
+const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
+  id: partial?.id || "demo-hallway",
+  name: partial?.name || "K‰yt‰v‰ A",
+  building: partial?.building || "",
+  isActive: partial?.isActive ?? true,
+  orientation: partial?.orientation || "landscape",
+  serial: partial?.serial || "",
+  scale: partial?.scale ?? 1,
+  weatherCity: partial?.weatherCity || "",
+  weatherLat: partial?.weatherLat,
+  weatherLon: partial?.weatherLon,
+  clockMode: partial?.clockMode || "auto",
+  clockDate: partial?.clockDate,
+  clockTime: partial?.clockTime,
+  infoEnabled: partial?.infoEnabled ?? false,
+  infoHtml: partial?.infoHtml || "",
+  floors: partial?.floors || [],
+});
+
+// ---------- Yhteiset sarakejako-funktiot ----------
+function computeLandscapeCounts(n: number): number[] {
+  if (n <= 0) return [];
+  const map: Record<number, number[]> = {
+    1: [1],
+    2: [1, 1],
+    3: [2, 1],
+    4: [2, 2],
+    5: [2, 2, 1],
+    6: [2, 2, 2],
+    7: [2, 2, 2, 1],
+    8: [2, 2, 2, 2],
+    9: [3, 2, 2, 2],
+    10: [3, 3, 2, 2],
+    11: [3, 3, 3, 2],
+    12: [3, 3, 3, 3],
+  };
+  if (map[n]) return map[n];
+  // Fallback > 12: t‰yt‰ 3/kolumni ja lis‰‰ uusi kolumni tarvittaessa
+  const base = 3;
+  const minCols = 4;
+  const cols = Math.ceil((n - 12) / base) + minCols;
+  const counts = Array(cols - 1).fill(base);
+  counts.push(Math.max(0, n - base * (cols - 1)));
+  return counts;
+}
+
+function computePortraitCounts(n: number): number[] {
+  if (n <= 0) return [];
+  const map: Record<number, number[]> = {
+    1: [1],
+    2: [2],
+    3: [3],
+    4: [4],
+    5: [3, 2],
+    6: [3, 3],
+    7: [4, 3],
+    8: [4, 4],
+    9: [5, 4],
+    10: [5, 5],
+    11: [6, 5],
+    12: [6, 6],
+    13: [5, 5, 3],
+    14: [5, 5, 4],
+    15: [5, 5, 5],
+  };
+  if (map[n]) return map[n];
+  const base = 5; // Fallback > 15
+  const cols = Math.ceil(n / base);
+  const counts = Array(cols - 1).fill(base);
+  counts.push(Math.max(0, n - base * (cols - 1)));
+  return counts;
+}
+
+function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][] {
+  const counts = orientation === "landscape" ? computeLandscapeCounts(items.length) : computePortraitCounts(items.length);
+  const out: Floor[][] = [];
+  let idx = 0;
+  for (let c = 0; c < counts.length; c++) {
+    const take = counts[c];
+    out.push(items.slice(idx, idx + take).reverse()); // n‰yt‰ alhaalta yl‰s
+    idx += take;
+  }
+  return out;
+}
+
+// Polku ruudun julkaisuihin
+const RUUTU_DIR = "ruutu";
+
+// ---------- Backend-API:t (sovita omaan ymp‰rist‰‰n) ----------
+async function fetchHallway(hallwayId: string): Promise<Hallway> {
+  // T‰ss‰ demossa palautetaan tyhj‰, jotta appi k‰ynnistyy ilman backendia
+  return emptyHallway({ id: hallwayId });
+}
+
+type SaveResult = { ok: boolean; status?: number; statusText?: string; error?: string };
+async function saveRuutu(hallway: Hallway, html: string, filename: string): Promise<SaveResult> {
+  try {
+    const serial = (hallway.serial || "").trim();
+    const endpoint = serial ? `/api/ruutu/${encodeURIComponent(serial)}` : `/api/ruutu`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hallway, html, filename, dir: RUUTU_DIR }),
+    });
+    if (!res.ok) return { ok: false, status: res.status, statusText: res.statusText };
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+// --- LG TV: staattisen HTML:n muodostus ---
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildStaticTvHtml(h: Hallway): string {
+  const orientation: Orientation = h.orientation || "landscape";
+  const floorsAsc = [...h.floors].sort((a, b) => a.level - b.level);
+  const floorsHtml = floorsAsc
+        .map((floor) => {
+          const apartmentsHtml = floor.apartments
+            .map((apt) => {
+              const tenants = (apt.tenants || [])
+                .filter((t) => t && t.surname && t.surname.trim().length > 0)
+                .map((t) => escapeHtml(t.surname.toUpperCase()));
+              const first = tenants[0] || '<span class="empty">(tyhj‰)</span>';
+              const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
+              const numberHtml = escapeHtml(apt.number || "-");
+              return (
+                `<div class="apt-row">` +
+                `<div class="apt-num">${numberHtml}</div>` +
+                `<div class="apt-names">` +
+                `<div class="apt-name">${first}</div>` +
+                `${rest}` +
+                `</div>` +
+                `</div>`
+              );
+            })
+            .join("");
+          return (
+            `<div class="floor">` +
+            `<div class="floor-title">${escapeHtml(String(floor.level))}. KERROS</div>` +
+            `<div class="apt-list">${apartmentsHtml}</div>` +
+            `</div>`
+          );
+        })
+        .join("");
+
+  const css = `
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
+#content{font-size:60%}
+#container{position:relative;height:100vh;width:100vw;overflow:hidden}
+#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px}
+#brand{box-sizing:border-box;text-align:right;margin-left:auto}
+#brand .title{font-size:28px;font-weight:600;letter-spacing:.02em}
+#brand .subtitle{opacity:.7;margin-top:-4px;font-size:14px}
+#wclock{box-sizing:border-box;display:flex;gap:16px;align-items:center}
+#wclock .time{font-size:28px;font-weight:600;letter-spacing:.02em}
+#wclock .date{font-size:12px;opacity:.75;margin-top:-2px}
+#wclock .icon{font-size:32px}
+#wclock .temps{line-height:1.1}
+#wclock .temps div{font-size:14px}
+#content{position:relative;padding:20px;transform-origin:top left}
+.split{display:flex;gap:32px}
+.left{width:50%}
+.right{width:50%;padding-left:16px;border-left:1px solid rgba(255,255,255,.3)}
+.floor{margin-bottom:24px}
+.floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:22px}
+.apt-row{display:flex;gap:24px;margin:6px 0}
+.apt-num{width:60px;font-weight:700;font-variant-numeric:tabular-nums}
+.apt-names{flex:1}
+.apt-name{font-weight:700;font-size:14px;line-height:1.1}
+.empty{opacity:.4}
+#footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
+`;
+
+  const jsonEmbedded = JSON.stringify(h).replace(/</g, "\\u003c");
+  const html = `<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
