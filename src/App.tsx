@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +52,17 @@ export type Hallway = {
   clockMode?: "auto" | "manual";
   clockDate?: string; // YYYY-MM-DD
   clockTime?: string; // HH:MM
+  weatherClockEnabled?: boolean;
+  // News
+  newsEnabled?: boolean;
+  newsRssUrl?: string;
+  newsLimit?: number;
+  // Logos
+  logos?: { id: string; url: string; name?: string }[];
+  logosAnimate?: boolean;
+  logosLimit?: number;
+  logosEnabled?: boolean;
+  logosBgColor?: string;
   // Info panel
   infoEnabled?: boolean;
   infoHtml?: string;
@@ -75,6 +86,15 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   clockMode: partial?.clockMode || "auto",
   clockDate: partial?.clockDate,
   clockTime: partial?.clockTime,
+  weatherClockEnabled: partial?.weatherClockEnabled ?? false,
+  newsEnabled: partial?.newsEnabled ?? false,
+  newsRssUrl: partial?.newsRssUrl || "",
+  newsLimit: partial?.newsLimit,
+  logos: partial?.logos || [],
+  logosAnimate: partial?.logosAnimate ?? false,
+  logosLimit: partial?.logosLimit,
+  logosEnabled: partial?.logosEnabled ?? false,
+  logosBgColor: partial?.logosBgColor || "",
   infoEnabled: partial?.infoEnabled ?? false,
   infoHtml: partial?.infoHtml || "",
   floors: partial?.floors || [],
@@ -261,10 +281,32 @@ function buildStaticTvHtml(h: Hallway): string {
     .join("");
 
   const baseW = orientation === "portrait" ? 1080 : 1920;
+  const baseH = orientation === "portrait" ? 1920 : 1080;
+  const logosAll = (h.logos || []).filter((l) => l && l.url);
+  const logosLimit = typeof h.logosLimit === "number" && h.logosLimit > 0 ? Math.floor(h.logosLimit) : null;
+  const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
+  const logosHeight = 130;
+  const logosBg = (h.logosBgColor || "").trim();
+  const logosBgStyle = logosBg ? ` style="background:${escapeHtml(logosBg)}"` : "";
+  const logosHtml = h.logosEnabled && logos.length
+    ? `<div id="logos" data-animate="${h.logosAnimate ? "true" : "false"}"${logosBgStyle}>
+         <div class="logos-track" id="logos-track">
+           ${logos
+             .map(
+               (l) =>
+                 `<div class="logo-item">` +
+                 `<img class="logo-img" src="${escapeHtml(l.url)}" alt="${escapeHtml(l.name || "Logo")}"/>` +
+                 `<div class="logo-name">${escapeHtml(l.name || "")}</div>` +
+                 `</div>`
+             )
+             .join("")}
+         </div>
+       </div>`
+    : "";
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
-#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:4em}
+#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px}
 #brand .title{font-size:28px;font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:14px}
 #clock{display:flex;align-items:center;gap:16px}
@@ -272,7 +314,8 @@ function buildStaticTvHtml(h: Hallway): string {
 #clock .date{font-size:12px;opacity:.7}
 #clock .temps{font-size:14px;line-height:1.1}
 #clock .icon{width:32px;height:32px}
-#content{position:relative;padding:20px;transform-origin:top left}
+#content{position:relative;padding:20px;transform-origin:top left;display:flex;flex-direction:column;height:${baseH}px}
+#main{flex:1;display:flex;align-items:stretch}
 .cols{display:flex;gap:32px;align-items:stretch}
 .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .col > .vcenter{margin:auto 0}
@@ -282,16 +325,35 @@ function buildStaticTvHtml(h: Hallway): string {
 .floor{margin-bottom:24px}
 .floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:22px}
 .apt-row{display:flex;gap:24px;margin:6px 0}
-.apt-num{width:60px;font-weight:700;font-variant-numeric:tabular-nums}
+.apt-num{width:30px;font-weight:700;font-variant-numeric:tabular-nums}
 .apt-names{flex:1}
 .apt-name{font-weight:700;font-size:14px;line-height:1.1}
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
 .info-content p:empty::before{content:'\\00a0';display:inline-block}
+#news{margin-top:0}
+#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:18px}
+#news .news-list{display:flex;flex-direction:column;gap:10px}
+#news .news-item{display:flex;gap:8px;font-size:14px;line-height:1.2}
+#news .news-num{font-weight:700}
+#news .news-text{display:flex;flex-direction:column;gap:2px}
+#news .news-cat{font-weight:700;font-size:120%}
+#news .news-title{font-weight:400;font-size:100%}
+#news + .info-content{margin-top:24px}
+#logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:transparent}
+#logos.logos-animate{justify-content:flex-start}
+#logos .logos-track{display:flex;align-items:center;gap:32px;height:100%;width:max-content}
+#logos .logo-item{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:120px}
+#logos .logo-img{height:60%;width:auto;max-width:100%;object-fit:contain}
+#logos .logo-name{display:none}
+#logos.logos-animate .logos-track{animation:logos-marquee 20s linear infinite}
+@keyframes logos-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 `;
 
   const jsonEmbedded = JSON.stringify(h).replace(/</g, "\\u003c");
   const infoHtml = (h.infoEnabled && (h.infoHtml || "").trim()) ? sanitizeInfoHtml(h.infoHtml || "") : "";
+  const newsEnabled = !!h.newsEnabled && (h.newsRssUrl || "").trim().length > 0;
+  const newsLimit = typeof h.newsLimit === "number" && h.newsLimit > 0 ? Math.floor(h.newsLimit) : null;
   const html = `<!doctype html>
 <html lang="fi">
 <head>
@@ -313,27 +375,34 @@ function buildStaticTvHtml(h: Hallway): string {
         <div class="title">${escapeHtml(h.building || "Rakennus")}</div>
         <div class="subtitle">${escapeHtml(h.name)}</div>
       </div>
-      <div id="clock" aria-label="Aika, päivämäärä ja sää">
+      ${h.weatherClockEnabled ? `
+      <div id="clock" aria-label="Aika, p?iv?m??r? ja s??">
         <div class="td">
           <div id="time" class="time">--.--</div>
           <div id="date" class="date">--.--.----</div>
         </div>
         <div id="wxicon" class="icon" aria-hidden="true"></div>
         <div class="temps">
-          <div id="tmax">– °C</div>
-          <div id="tmin" class="min">– °C</div>
+          <div id="tmax">? ?C</div>
+          <div id="tmin" class="min">? ?C</div>
         </div>
-      </div>
+      </div>` : ""}
     </div>
     <div id="content" style="width:${'${'}baseW${'}'}px">
-      <div class="cols ${infoHtml ? 'cols-2' : 'cols-1'}">
-        <div class="col col-main">
-          <div class="inner-pad">
-            ${floorsHtml}
+      <div id="main">
+        <div class="cols ${(infoHtml || newsEnabled) ? 'cols-2' : 'cols-1'}">
+          <div class="col col-main">
+            <div class="inner-pad">
+              ${floorsHtml}
+            </div>
           </div>
+          ${(infoHtml || newsEnabled) ? `<div class="col col-info"><div class="inner-pad">
+            ${newsEnabled ? `<div id="news"><div class="news-title">Uutiset</div><div class="news-list" id="news-list"></div></div>` : ``}
+            ${infoHtml ? `<div class="info-content">${infoHtml}</div>` : ``}
+          </div></div>` : ``}
         </div>
-        ${infoHtml ? `<div class="col col-info"><div class="inner-pad"><div class="info-content">${infoHtml}</div></div></div>` : ``}
       </div>
+      ${logosHtml}
     </div>
     <div id="footer"></div>
   </div>
@@ -346,6 +415,9 @@ function buildStaticTvHtml(h: Hallway): string {
   var CITY = ${JSON.stringify(h.weatherCity || "")};
   var LAT = ${typeof h.weatherLat === 'number' ? h.weatherLat : 'null'};
   var LON = ${typeof h.weatherLon === 'number' ? h.weatherLon : 'null'};
+  var NEWS_ENABLED = ${newsEnabled ? 'true' : 'false'};
+  var NEWS_URL = ${JSON.stringify((h.newsRssUrl || "").trim())};
+  var NEWS_LIMIT = ${newsLimit ? newsLimit : 'null'};
   function fit(){
     var C=document.getElementById('container');
     var H=document.getElementById('header');
@@ -427,10 +499,59 @@ function buildStaticTvHtml(h: Hallway): string {
       var ic=document.getElementById('wxicon'); if(ic) ic.innerHTML = iconFor(code);
     }catch(e){ setTemps(NaN, NaN); }
   }
+  async function loadNews(){
+    if(!NEWS_ENABLED || !NEWS_URL) return;
+    try{
+      var proxyUrl = '/api/rss?url=' + encodeURIComponent(NEWS_URL);
+      var res = await fetch(proxyUrl, { cache:'no-store' });
+      if(!res.ok) throw new Error('news');
+      var text = await res.text();
+      var doc = new DOMParser().parseFromString(text, 'text/xml');
+      var items = Array.prototype.slice.call(doc.querySelectorAll('item'));
+      var entries = items.length ? items : Array.prototype.slice.call(doc.querySelectorAll('entry'));
+      var out = [];
+      for(var i=0;i<entries.length;i++){
+        var el = entries[i];
+        var titleEl = el.querySelector('title');
+        var catEl = el.querySelector('category') || el.querySelector('dc\\\\:subject');
+        var title = titleEl ? titleEl.textContent : '';
+        var cat = '';
+        if(catEl){
+          cat = (catEl.textContent || catEl.getAttribute('term') || '');
+        }
+        if(title){
+          out.push({ title: title.trim(), category: (cat || '').trim() });
+        }
+      }
+      if(NEWS_LIMIT && NEWS_LIMIT > 0) out = out.slice(0, NEWS_LIMIT);
+      var list = document.getElementById('news-list');
+      if(list){
+        list.innerHTML = out.length ? out.map(function(item, idx){
+          var safeTitle = String(item.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          var safeCat = String(item.category || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return '<div class="news-item"><div class="news-num">'+(idx+1)+'.</div><div class="news-text">' +
+            (safeCat ? '<div class="news-cat">'+safeCat+'</div>' : '') +
+            '<div class="news-title">'+safeTitle+'</div></div></div>';
+        }).join('') : '<div class="news-item opacity-60">-</div>';
+      }
+    }catch(e){}
+  }
+  function setupLogos(){
+    try{
+      var logos = document.getElementById('logos');
+      var track = document.getElementById('logos-track');
+      if(!logos || !track) return;
+      var animate = logos.getAttribute('data-animate') === 'true';
+      if(!animate) return;
+      if(track.scrollWidth <= logos.clientWidth) return;
+      logos.classList.add('logos-animate');
+      track.insertAdjacentHTML('beforeend', track.innerHTML);
+    }catch(e){}
+  }
   window.addEventListener('resize', fit);
   document.addEventListener('DOMContentLoaded', fit);
   setTimeout(fit, 50);
-  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); });
+  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); loadNews(); setupLogos(); });
 })();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
 </body>
@@ -488,7 +609,7 @@ function openStaticPreviewTab(h: Hallway) {
 // ---------- Pääkomponentti ----------
 export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
   const [hallway, setHallway] = useState<Hallway>(emptyHallway());
-  const [activeTab, setActiveTab] = useState<"hallinta" | "saa" | "info">("hallinta");
+  const [activeTab, setActiveTab] = useState<"hallinta" | "saa" | "info" | "uutiset" | "mainokset">("hallinta");
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -496,6 +617,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [showSavedDialog, setShowSavedDialog] = useState<boolean>(false);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [serverSaveWarning, setServerSaveWarning] = useState<string>("");
+  const [isCityOpen, setIsCityOpen] = useState<boolean>(false);
+  const [logoError, setLogoError] = useState<string>("");
+  const [logoUploading, setLogoUploading] = useState<boolean>(false);
+  const [activeLogoId, setActiveLogoId] = useState<string | null>(null);
 
   // Käynnistyspromptti
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
@@ -655,6 +780,66 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     setError("");
   };
 
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("file-read-failed"));
+      reader.readAsDataURL(file);
+    });
+
+  const uploadLogoFile = async (file: File) => {
+    const dataUrl = await readFileAsDataUrl(file);
+    const res = await fetch("/api/logo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl, filename: file.name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return { url: String(data.url || ""), name: String(data.name || "") };
+  };
+
+  const handleLogoFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const existingCount = (hallway.logos || []).length;
+    if (existingCount + files.length > 20) {
+      setLogoError("Enintään 20 logoa sallittu.");
+      return;
+    }
+    setLogoError("");
+    setLogoUploading(true);
+    try {
+      const uploadedLogos: { id: string; url: string; name?: string }[] = [];
+      for (const file of Array.from(files)) {
+        const uploaded = await uploadLogoFile(file);
+        const cleanName = file.name.replace(/\.[^.]+$/, "");
+        uploadedLogos.push({ id: uid(), url: uploaded.url, name: uploaded.name || cleanName });
+      }
+      setHallway((h) => ({ ...h, logos: [...(h.logos || []), ...uploadedLogos] }));
+    } catch (e: any) {
+      setLogoError(e?.message || "Logo-upload ep„onnistui");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const moveLogo = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setHallway((h) => {
+      const list = [...(h.logos || [])];
+      const fromIdx = list.findIndex((l) => l.id === fromId);
+      const toIdx = list.findIndex((l) => l.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return h;
+      const [item] = list.splice(fromIdx, 1);
+      list.splice(toIdx, 0, item);
+      return { ...h, logos: list };
+    });
+  };
+
+  const removeLogo = (logoId: string) =>
+    setHallway((h) => ({ ...h, logos: (h.logos || []).filter((l) => l.id !== logoId) }));
+
   const handleSave = async () => {
     const serial = hallway.serial?.trim();
     if (!serial) {
@@ -712,6 +897,20 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     console.assert(!!restored && typeof restored === "object", "Upotetun JSON:n palautus epäonnistui");
   }, [hallway]);
 
+  const cityQuery = hallway.weatherCity || "";
+  const cityMatches = useMemo(
+    () =>
+      FI_MUNICIPALITIES
+        .filter((n) => n.toLowerCase().includes(cityQuery.trim().toLowerCase()))
+        .slice(0, 8),
+    [cityQuery]
+  );
+  const showCitySuggest =
+    isCityOpen &&
+    cityQuery.trim().length >= 2 &&
+    cityMatches.length > 0 &&
+    hallway.weatherClockEnabled;
+
   if (loading) {
     return <div className="p-6 text-sm opacity-70">Ladataan hallintaa...</div>;
   }
@@ -752,10 +951,35 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           <div className="text-xl font-semibold">Infovisio</div>
           <div role="tablist" className="flex gap-3">
             <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Hallinta</button>
+            <button role="tab" aria-selected={activeTab === "uutiset"} onClick={() => setActiveTab("uutiset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "uutiset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Uutiset</button>
+            <button role="tab" aria-selected={activeTab === "mainokset"} onClick={() => setActiveTab("mainokset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "mainokset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Mainokset</button>
             <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
             <button role="tab" aria-selected={activeTab === "saa"} onClick={() => setActiveTab("saa")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "saa" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Sää + aika</button>
           </div>
-          <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.max(0.5, Math.round((((h.scale ?? 1) - 0.05) * 100)) / 100) }))}>-</Button>
+              <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
+              <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
+              <select
+                id="orientation"
+                value={hallway.orientation || "landscape"}
+                onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))}
+                className="h-9 px-2 rounded-md border bg-white text-black"
+              >
+                <option value="portrait">Pysty</option>
+                <option value="landscape">Vaaka</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
+              <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
+            </div>
+            <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+          </div>
         </div>
       </div>
       {/* Editori (kolumni 1) */}
@@ -781,50 +1005,24 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <p className="text-sm opacity-70">Jos haluat tiedottaa yleisölle jotain, voit tehdä sen ottamalla infoalue käyttöön ja syöttämällä tekstiä ja antamalla sille haluamasi tyylit.</p>
                 </>
               )}
-            </div>
-            <div className="hidden items-center gap-3">
-              {/* Näytön suunta */}
-              <div className="flex items-center gap-2">
-                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
-                <select
-                  id="orientation"
-                  value={hallway.orientation || "landscape"}
-                  onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))}
-                  className="h-9 px-2 rounded-md border bg-white text-black"
-                >
-                  <option value="portrait">Pysty</option>
-                  <option value="landscape">Vaaka</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
-                <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
-              </div>
-              <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="hidden rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+              {activeTab === 'uutiset' && (
+                <>
+                  <CardTitle className="text-xl flex items-center gap-2"><Newspaper className="h-5 w-5"/>Asukasnäyttö - Uutiset</CardTitle>
+                  <p className="text-sm opacity-70">Näytä RSS-syötteestä uutiset ruudun oikeassa laidassa sään alapuolella. Määritä syötteen osoite ja halutessasi näytettävien uutisten määrä.</p>
+                </>
+              )}
+              {activeTab === 'mainokset' && (
+                <>
+                  <CardTitle className="text-xl flex items-center gap-2"><Building2 className="h-5 w-5"/>Asukasnäyttö - Mainokset</CardTitle>
+                  <p className="text-sm opacity-70">Lisää logot, järjestä ne vetämällä ja määritä näkyvien logoiden määrä.</p>
+                </>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             {activeTab === "hallinta" && (
             <>
             {/* Sarjanumero */}
-            <div className="mb-3 flex items-center gap-4 justify-end">
-              <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.max(0.5, Math.round((((h.scale ?? 1) - 0.05) * 100)) / 100) }))}>-</Button>
-                <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
-                <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
-              </div>
-                <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
-                <select id="orientation" value={hallway.orientation || "landscape"} onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))} className="h-9 px-2 rounded-md border bg-white text-black">
-                  <option value="portrait">Pysty</option>
-                  <option value="landscape">Vaaka</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
-                <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
-              </div>
-            </div>
             <div className="mb-4">
               <Label htmlFor="device-serial">Uuden laitteen sarjanumero <span className="text-red-600" aria-hidden="true">*</span></Label>
               <Input
@@ -938,41 +1136,229 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             </>
             )}
 
+            {activeTab === "uutiset" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="news-enabled"
+                    checked={!!hallway.newsEnabled}
+                    onCheckedChange={(v) => setHallway((h) => ({ ...h, newsEnabled: v }))}
+                  />
+                  <Label htmlFor="news-enabled">Käytössä</Label>
+                </div>
+
+                <div>
+                  <Label htmlFor="news-url">RSS-syötteen osoite</Label>
+                  <Input
+                    id="news-url"
+                    value={hallway.newsRssUrl || ""}
+                    onChange={(e) => setHallway((h) => ({ ...h, newsRssUrl: e.target.value }))}
+                    placeholder="https://example.com/rss"
+                    disabled={!hallway.newsEnabled}
+                  />
+                  <div className="text-xs opacity-70 mt-1">Syöte haetaan palvelimen kautta ja päivittyy automaattisesti.</div>
+                </div>
+
+                <div className="max-w-xs">
+                  <Label htmlFor="news-limit">Näytettävien uutisten määrä</Label>
+                  <Input
+                    id="news-limit"
+                    type="number"
+                    min={1}
+                    value={hallway.newsLimit ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      const num = v ? Number(v) : NaN;
+                      setHallway((h) => ({
+                        ...h,
+                        newsLimit: Number.isFinite(num) && num > 0 ? Math.floor(num) : undefined,
+                      }));
+                    }}
+                    placeholder="Näytä kaikki"
+                    disabled={!hallway.newsEnabled}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "mainokset" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="logos-enabled"
+                    checked={!!hallway.logosEnabled}
+                    onCheckedChange={(v) => setHallway((h) => ({ ...h, logosEnabled: v }))}
+                  />
+                  <Label htmlFor="logos-enabled">Käytössä</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="logos-animate"
+                    type="checkbox"
+                    checked={!!hallway.logosAnimate}
+                    onChange={(e) => setHallway((h) => ({ ...h, logosAnimate: e.target.checked }))}
+                  />
+                  <Label htmlFor="logos-animate">Animoi logot</Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div>
+                    <Label>Logoja näkyvissä</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={hallway.logosLimit ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        const num = v ? Number(v) : NaN;
+                        setHallway((h) => ({ ...h, logosLimit: Number.isFinite(num) ? Math.min(20, Math.max(1, num)) : undefined }));
+                      }}
+                      placeholder="N&auml;yt&auml; kaikki"
+                      disabled={!hallway.logosEnabled}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <Label>Taustaväri (hex)</Label>
+                    <Input
+                      value={hallway.logosBgColor || ""}
+                      onChange={(e) => setHallway((h) => ({ ...h, logosBgColor: e.target.value.trim() }))}
+                      placeholder="#111111"
+                      disabled={!hallway.logosEnabled}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <Label>Lataa logot (max 20)</Label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleLogoFiles(e.target.files)}
+                      className="mt-1 block w-full text-sm"
+                      disabled={!hallway.logosEnabled}
+                    />
+                  </div>
+                </div>
+
+                {logoUploading && <div className="text-sm opacity-70">Logoja ladataan...</div>}
+                {logoError && <div className="text-sm text-red-600">{logoError}</div>}
+                <div className="text-xs opacity-70">Logoja yhteensä: {(hallway.logos || []).length}/20</div>
+
+                {(hallway.logos || []).length === 0 ? (
+                  <div className="text-sm opacity-70">Ei logoja vielä.</div>
+                ) : (
+                  <div className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3", !hallway.logosEnabled && "opacity-50")}>
+                    {(hallway.logos || []).map((logo) => (
+                      <div
+                        key={logo.id}
+                        draggable
+                        onDragStart={(e) => e.dataTransfer.setData("text/plain", logo.id)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const fromId = e.dataTransfer.getData("text/plain");
+                          if (fromId) moveLogo(fromId, logo.id);
+                        }}
+                        onClick={() => setActiveLogoId(logo.id)}
+                        className={cn(
+                          "relative rounded-lg border bg-white p-2 cursor-move",
+                          activeLogoId === logo.id ? "ring-2 ring-black" : "border-zinc-200"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeLogo(logo.id);
+                          }}
+                          className="absolute top-1 right-1 text-xs text-zinc-600 hover:text-black"
+                          aria-label="Poista logo"
+                          disabled={!hallway.logosEnabled}
+                        >
+                          Poista
+                        </button>
+                        <div className="flex items-center justify-center h-24">
+                          <img src={logo.url} alt={logo.name || "Logo"} className="max-h-full max-w-full object-contain" />
+                        </div>
+                        {activeLogoId === logo.id ? (
+                          <Input
+                            value={logo.name || ""}
+                            onChange={(e) =>
+                              setHallway((h) => ({
+                                ...h,
+                                logos: (h.logos || []).map((l) => (l.id === logo.id ? { ...l, name: e.target.value } : l)),
+                              }))
+                            }
+                            placeholder="Logon nimi"
+                            className="mt-2"
+                            disabled={!hallway.logosEnabled}
+                          />
+                        ) : (
+                          <div className="mt-2 text-xs text-center truncate">{logo.name || "Nimeä logo"}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "saa" && (
               <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="weather-enabled"
+                    checked={!!hallway.weatherClockEnabled}
+                    onCheckedChange={(v) => setHallway((h) => ({ ...h, weatherClockEnabled: v }))}
+                  />
+                  <Label htmlFor="weather-enabled">Käytössä</Label>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="relative">
                     <Label>Kaupunki</Label>
                     <Input
-                      value={hallway.weatherCity || ""}
-                      onChange={(e) => setHallway(h => ({ ...h, weatherCity: e.target.value }))}
+                      value={cityQuery}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setHallway((h) => ({ ...h, weatherCity: next, weatherLat: undefined, weatherLon: undefined }));
+                        setIsCityOpen(next.trim().length >= 2);
+                      }}
+                      onFocus={() => setIsCityOpen(cityQuery.trim().length >= 2)}
+                      onBlur={() => setIsCityOpen(false)}
                       placeholder="esim. Helsinki"
                       aria-autocomplete="list"
-                      aria-expanded={(hallway.weatherCity || "").trim().length >= 2 ? true : false}
+                      aria-expanded={showCitySuggest ? true : false}
                       aria-controls="city-suggest"
+                      disabled={!hallway.weatherClockEnabled}
                     />
-                    {((hallway.weatherCity || "").trim().length >= 2) && (
+                    {showCitySuggest && (
                       <div id="city-suggest" role="listbox" className="absolute z-20 mt-1 w-full rounded-md border bg-white text-black shadow">
-                        {FI_MUNICIPALITIES
-                          .filter((n) => n.toLowerCase().includes((hallway.weatherCity || "").trim().toLowerCase()))
-                          .slice(0, 8)
-                          .map((name) => (
-                            <button
-                              key={name}
-                              type="button"
-                              role="option"
-                              onClick={() => setHallway(h => ({ ...h, weatherCity: name }))}
-                              className="block w-full text-left px-3 py-1.5 hover:bg-zinc-100"
-                            >
-                              {name}
-                            </button>
-                          ))}
+                        {cityMatches.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            role="option"
+                            onMouseDown={(e) => {
+                              // Ensure selection before input blur/unmounts the list.
+                              e.preventDefault();
+                              setHallway((h) => ({ ...h, weatherCity: name, weatherLat: undefined, weatherLon: undefined }));
+                              setIsCityOpen(false);
+                            }}
+                            className="block w-full text-left px-3 py-1.5 hover:bg-zinc-100"
+                          >
+                            {name}
+                          </button>
+                        ))}
                       </div>
                     )}
                     <div className="mt-1 text-xs text-zinc-600">
                       {((hallway.weatherCity || "").trim())
                         ? <>Näytetään: <span className="font-medium">{hallway.weatherCity}</span></>
-                        : <>Ei asetettu — käytetään automaattista paikannusta tai oletuksena Helsingin säätä.</>
+                        : <>Ei asetettu - käytetään automaattista paikannusta tai oletuksena Helsingin säätä.</>
                       }
                     </div>
                   </div>
@@ -981,11 +1367,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <div className="font-medium mb-2">Ajan asetus</div>
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2">
-                      <input type="radio" name="clockmode" checked={(hallway.clockMode || "auto") === "auto"} onChange={() => setHallway(h => ({ ...h, clockMode: "auto" }))} />
+                      <input type="radio" name="clockmode" checked={(hallway.clockMode || "auto") === "auto"} onChange={() => setHallway(h => ({ ...h, clockMode: "auto" }))} disabled={!hallway.weatherClockEnabled} />
                       <span>Automaattinen</span>
                     </label>
                     <label className="flex items-center gap-2">
-                      <input type="radio" name="clockmode" checked={hallway.clockMode === "manual"} onChange={() => setHallway(h => ({ ...h, clockMode: "manual" }))} />
+                      <input type="radio" name="clockmode" checked={hallway.clockMode === "manual"} onChange={() => setHallway(h => ({ ...h, clockMode: "manual" }))} disabled={!hallway.weatherClockEnabled} />
                       <span>Manuaalinen</span>
                     </label>
                   </div>
@@ -993,11 +1379,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                       <div>
                         <Label>Päivämäärä</Label>
-                        <Input type="date" value={hallway.clockDate || ""} onChange={(e) => setHallway((h) => ({ ...h, clockDate: e.target.value }))} />
+                        <Input type="date" value={hallway.clockDate || ""} onChange={(e) => setHallway((h) => ({ ...h, clockDate: e.target.value }))} disabled={!hallway.weatherClockEnabled} />
                       </div>
                       <div>
                         <Label>Kellonaika</Label>
-                        <Input type="time" step={60} value={hallway.clockTime || ""} onChange={(e) => setHallway((h) => ({ ...h, clockTime: e.target.value }))} />
+                        <Input type="time" step={60} value={hallway.clockTime || ""} onChange={(e) => setHallway((h) => ({ ...h, clockTime: e.target.value }))} disabled={!hallway.weatherClockEnabled} />
                       </div>
                     </div>
                   )}
@@ -1010,8 +1396,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             {activeTab === "info" && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="info-enabled">Käytössä</Label>
                   <Switch id="info-enabled" checked={!!hallway.infoEnabled} onCheckedChange={(v) => setHallway((h) => ({ ...h, infoEnabled: v }))} />
+                  <Label htmlFor="info-enabled">Käytössä</Label>
                 </div>
                 <div>
                   <Label>Sisältö</Label>
@@ -1082,6 +1468,10 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const [boxSize, setBoxSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const lastLandscapeRef = useRef<{ w: number; h: number } | null>(null);
   const [scaleHint, setScaleHint] = useState(1);
+  const logosRef = useRef<HTMLDivElement>(null);
+  const logosTrackRef = useRef<HTMLDivElement>(null);
+  const [logosShouldAnimate, setLogosShouldAnimate] = useState(false);
+  const [newsItems, setNewsItems] = useState<{ title: string; category: string }[]>([]);
 
   // No column count verification anymore; we always render a single list column
 
@@ -1156,6 +1546,83 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     };
   }, [orientation, hallway, floorsAsc.length]);
 
+  const logosAll = useMemo(
+    () => (hallway.logos || []).filter((l): l is { id: string; url: string; name?: string } => !!(l && l.url)),
+    [hallway.logos]
+  );
+  const logosLimit = typeof hallway.logosLimit === "number" && hallway.logosLimit > 0 ? Math.floor(hallway.logosLimit) : null;
+  const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
+  const shouldAnimate = !!hallway.logosAnimate && logosShouldAnimate && !!hallway.logosEnabled;
+  const newsEnabled = !!hallway.newsEnabled && (hallway.newsRssUrl || "").trim().length > 0;
+  const newsLimit = typeof hallway.newsLimit === "number" && hallway.newsLimit > 0 ? Math.floor(hallway.newsLimit) : null;
+  const baseW = orientation === "portrait" ? 1080 : 1920;
+  const baseH = orientation === "portrait" ? 1920 : 1080;
+  const logosHeight = 130;
+  const renderLogos = shouldAnimate ? [...logos, ...logos] : logos;
+
+  useEffect(() => {
+    if (!hallway.logosEnabled) {
+      setLogosShouldAnimate(false);
+      return;
+    }
+    if (!hallway.logosAnimate) {
+      setLogosShouldAnimate(false);
+      return;
+    }
+    const track = logosTrackRef.current;
+    const wrap = logosRef.current;
+    if (!track || !wrap) return;
+    const measure = () => {
+      const width = logosShouldAnimate ? track.scrollWidth / 2 : track.scrollWidth;
+      setLogosShouldAnimate(width > wrap.clientWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(track);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [hallway.logosAnimate, logos.length, boxSize.w, orientation, logosShouldAnimate]);
+
+  useEffect(() => {
+    if (!newsEnabled) {
+      setNewsItems([]);
+      return;
+    }
+    let cancelled = false;
+    const url = (hallway.newsRssUrl || "").trim();
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/rss?url=${encodeURIComponent(url)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("news-http");
+        const text = await res.text();
+        const doc = new DOMParser().parseFromString(text, "text/xml");
+        const items = Array.from(doc.querySelectorAll("item"));
+        const entries = items.length ? items : Array.from(doc.querySelectorAll("entry"));
+        const parsed = entries
+          .map((el) => {
+            const title = el.querySelector("title")?.textContent?.trim() || "";
+            const category =
+              el.querySelector("category")?.textContent?.trim() ||
+              el.querySelector("dc\\:subject")?.textContent?.trim() ||
+              el.querySelector("category")?.getAttribute("term")?.trim() ||
+              "";
+            return title ? { title, category } : null;
+          })
+          .filter((v): v is { title: string; category: string } => !!v);
+        const sliced = newsLimit ? parsed.slice(0, newsLimit) : parsed;
+        if (!cancelled) setNewsItems(sliced);
+      } catch {
+        if (!cancelled) setNewsItems([]);
+      }
+    };
+    load();
+    const id = setInterval(load, 10 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [newsEnabled, hallway.newsRssUrl, newsLimit]);
+
   return (
     <div
       ref={containerRef}
@@ -1174,37 +1641,39 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
         <div
           ref={scaleRootRef}
           style={{
-            width: hallway.orientation === "portrait" ? 1080 : 1920,
+            width: baseW,
             transform: `scale(${(gridScale * scaleHint * (hallway.scale ?? 1)).toFixed(3)})`,
             transformOrigin: "top left",
           }}
         >
-          <div className="p-5">
-        <div className="flex items-start justify-between pt-5 px-5" style={{ marginBottom: '4em' }}>
+          <div className="p-5" style={{ height: baseH, display: "flex", flexDirection: "column" }}>
+        <div className="flex items-start justify-between pt-5 px-5">
           <div>
             <div className="text-2xl font-semibold tracking-wide">{hallway.building || "Rakennus"}</div>
             <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
           </div>
-          <WeatherClock
-            tvStyle
-            city={hallway.weatherCity}
-            lat={hallway.weatherLat}
-            lon={hallway.weatherLon}
-            clockMode={hallway.clockMode}
-            manualDate={hallway.clockDate}
-            manualTime={hallway.clockTime}
-          />
+          {hallway.weatherClockEnabled && (
+            <WeatherClock
+              tvStyle
+              city={hallway.weatherCity}
+              lat={hallway.weatherLat}
+              lon={hallway.weatherLon}
+              clockMode={hallway.clockMode}
+              manualDate={hallway.clockDate}
+              manualTime={hallway.clockTime}
+            />
+          )}
         </div>
 
-        <div className="p-5 pt-4 flex gap-8 items-stretch">
-          <div className={cn((hallway.infoEnabled && (hallway.infoHtml || "").trim()) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
+        <div className="p-5 pt-4 flex-1 flex gap-8 items-stretch">
+          <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
             <div className="vcenter w-full" style={{ paddingLeft: '10%', paddingRight: '10%' }}>
               {floorsAsc.map((floor) => (
                 <div key={floor.id} className="mb-6">
                   <div className="text-xl font-semibold uppercase mb-3">{floor.level}. KERROS</div>
                   <div className="flex flex-col gap-3">
                   {floor.apartments.map((apt) => (
-                    <div key={apt.id} className="grid grid-cols-[60px_1fr] gap-x-6">
+                    <div key={apt.id} className="grid grid-cols-[30px_1fr] gap-x-6">
                       <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
                       <div className="text-sm font-semibold break-words whitespace-normal">
                         {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
@@ -1227,14 +1696,55 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             ))}
             </div>
           </div>
-          {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
+          {((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) && (
             <div className="basis-1/2 min-w-0 p-2">
               <div style={{ paddingLeft: '10%', paddingRight: '10%' }}>
-                <div className="info-content" dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+                {newsEnabled && (
+                  <div className="news-block">
+                    <div className="news-title">Uutiset</div>
+                    <div className="news-list">
+                    {newsItems.length === 0 ? (
+                      <div className="news-item opacity-60">-</div>
+                    ) : (
+                      newsItems.map((item, i) => (
+                        <div key={i} className="news-item">
+                          <div className="news-num">{i + 1}.</div>
+                          <div className="news-text">
+                            {item.category ? <div className="news-cat">{item.category}</div> : null}
+                            <div className="news-title">{item.title}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    </div>
+                  </div>
+                )}
+                {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
+                  <div className={cn("info-content", newsEnabled && "mt-6")} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+                )}
               </div>
             </div>
           )}
         </div>
+        {!!hallway.logosEnabled && logos.length > 0 && (
+          <div
+            ref={logosRef}
+            className={cn(
+              "logo-strip w-full overflow-hidden flex",
+              shouldAnimate ? "logos-animate" : "justify-center"
+            )}
+            style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent" }}
+          >
+            <div ref={logosTrackRef} className="logos-track h-full">
+              {renderLogos.map((logo, idx) => (
+                <div key={`${logo.id}-${idx}`} className="logo-item h-full">
+                  <img src={logo.url} alt={logo.name || "Logo"} className="logo-img" />
+                  <div className="logo-name">{logo.name || ""}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>
       </div>
       </div>
@@ -1245,3 +1755,5 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     </div>
   );
 }
+
+

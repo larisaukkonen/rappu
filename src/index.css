@@ -11,14 +11,26 @@ html, body {
 }
 
 /* Slate editor + preview Info content styles */
-.slate-editable h1, .info-content h1 {
+.slate-editable h1 {
   font-size: 250%;
   font-weight: 700;
   line-height: 1.2;
   margin: 0.4em 0 0.3em;
 }
-.slate-editable h2, .info-content h2 {
+.info-content h1 {
+  font-size: calc(250% * var(--preview-text-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0.4em 0 0.3em;
+}
+.slate-editable h2 {
   font-size: 180%;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.4em 0 0.2em;
+}
+.info-content h2 {
+  font-size: calc(180% * var(--preview-text-scale, 1));
   font-weight: 700;
   line-height: 1.25;
   margin: 0.4em 0 0.2em;
@@ -49,3 +61,97 @@ html, body {
   display: block;
   width: 100%;
 }
+
+/* Logos carousel (preview) */
+.logos-track {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 100%;
+  width: max-content;
+}
+.logo-strip {
+  display: flex;
+}
+.logo-item {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 120px;
+}
+.logo-img {
+  height: 60%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+.logo-name {
+  font-size: 12px;
+  opacity: 0.8;
+  text-align: center;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logo-strip .logo-name {
+  display: none;
+}
+.logos-animate .logos-track {
+  animation: logos-marquee 20s linear infinite;
+}
+@keyframes logos-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* News (preview) */
+.news-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  font-size: calc(18px * var(--preview-text-scale, 1));
+}
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.news-item {
+  display: flex;
+  gap: 8px;
+  font-size: calc(14px * var(--preview-text-scale, 1));
+  line-height: 1.2;
+}
+.news-num {
+  font-weight: 700;
+  background: #ffffff;
+  color:#000000;
+  padding: 4px;
+  display:block;
+  border-radius:6px;
+  margin-right: 5px;
+}
+.news-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.news-cat {
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 0;
+  font-size: calc(120% * var(--preview-text-scale, 1));
+}
+.news-title {
+  font-weight: 400;
+  font-size: calc(100% * var(--preview-text-scale, 1));
+}
+.news-block + .info-content {
+  margin-top: 24px;
+}
+
+.info-content p {margin-bottom:10px;}

@@ -12,6 +12,7 @@ export type WeatherClockProps = {
   manualTime?: string;
   timeZone?: string;
   tvStyle?: boolean; // when true, use fixed px sizes to match blob
+  textScale?: number;
 };
 
 const Ic = {
@@ -73,7 +74,7 @@ function parseManual(date?: string, time?: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-export default function WeatherClock({ className, city, lat, lon, clockMode = "auto", manualDate, manualTime, timeZone, tvStyle = true }: WeatherClockProps) {
+export default function WeatherClock({ className, city, lat, lon, clockMode = "auto", manualDate, manualTime, timeZone, tvStyle = true, textScale = 1 }: WeatherClockProps) {
   const [now, setNow] = useState<Date>(new Date());
   const [weather, setWeather] = useState<Weather>({ tMinC: null, tMaxC: null, weathercode: null });
   const tz = useMemo(() => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone, [timeZone]);
@@ -125,28 +126,40 @@ export default function WeatherClock({ className, city, lat, lon, clockMode = "a
 
   const manual = useMemo(() => parseManual(manualDate, manualTime), [manualDate, manualTime]);
   const displayNow = clockMode === "manual" && manual ? manual : now;
+  const dayStr = useMemo(() => displayNow.toLocaleDateString("fi-FI", { weekday: "long" }), [displayNow]);
   const timeStr = useMemo(() => displayNow.toLocaleTimeString("fi-FI", { hour: "2-digit", minute: "2-digit" }).replace(":", "."), [displayNow]);
   const dateStr = useMemo(() => displayNow.toLocaleDateString("fi-FI", { day: "2-digit", month: "2-digit", year: "numeric" }), [displayNow]);
   const Icon = iconForCode(weather.weathercode);
 
-  const timeStyle = tvStyle ? { fontSize: 28, fontWeight: 600 } : undefined;
-  const dateStyle = tvStyle ? { fontSize: 12 } : undefined;
-  const iconSize = tvStyle ? 32 : 36;
-  const tempStyle: React.CSSProperties | undefined = tvStyle ? { fontSize: 14 } : undefined;
+  const timeStyle = tvStyle ? { fontSize: 28 * textScale, fontWeight: 600 } : undefined;
+  const dayStyle = tvStyle ? { fontSize: 12 * textScale } : undefined;
+  const dateStyle = tvStyle ? { fontSize: 12 * textScale } : undefined;
+  const iconSize = tvStyle ? 32 * textScale : 36 * textScale;
+  const tempStyle: React.CSSProperties | undefined = tvStyle ? { fontSize: 14 * textScale } : undefined;
+  const maxTempStyle: React.CSSProperties = { fontSize: `${220 * textScale}%`, lineHeight: 1 };
+  const cityLabel = (city || "").trim() || "Helsinki";
 
   return (
-    <div className={"flex items-center gap-4 " + (className || "")} aria-label="Aika, päivämäärä ja sää">
-      <div className="flex flex-col leading-tight select-none">
+    <div className={"flex items-center gap-6 " + (className || "")} aria-label="Aika, päivämäärä ja sää">
+      <div className="flex flex-col leading-tight select-none text-center">
+        <div style={dayStyle} className="opacity-70">{dayStr}</div>
         <div style={timeStyle} className="tabular-nums">{timeStr}</div>
         <div style={dateStyle} className="opacity-70 tabular-nums">{dateStr}</div>
       </div>
-      <div aria-hidden>
+      <div aria-hidden className="flex items-center justify-center">
         <Icon width={iconSize} height={iconSize} />
       </div>
-      <div style={tempStyle} className="leading-tight tabular-nums">
-        <div>{formatNumber(weather.tMaxC)} °C</div>
+      <div style={tempStyle} className="flex flex-col items-center leading-tight text-center tabular-nums">
+        <div className="opacity-70">{cityLabel}</div>
+        <div style={maxTempStyle}>{formatNumber(weather.tMaxC)} °C</div>
         <div className="opacity-80">{formatNumber(weather.tMinC)} °C</div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
