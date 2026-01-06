@@ -12,7 +12,6 @@ export type WeatherClockProps = {
   manualTime?: string;
   timeZone?: string;
   tvStyle?: boolean; // when true, use fixed px sizes to match blob
-  textScale?: number;
 };
 
 const Ic = {
@@ -74,7 +73,7 @@ function parseManual(date?: string, time?: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-export default function WeatherClock({ className, city, lat, lon, clockMode = "auto", manualDate, manualTime, timeZone, tvStyle = true, textScale = 1 }: WeatherClockProps) {
+export default function WeatherClock({ className, city, lat, lon, clockMode = "auto", manualDate, manualTime, timeZone, tvStyle = true }: WeatherClockProps) {
   const [now, setNow] = useState<Date>(new Date());
   const [weather, setWeather] = useState<Weather>({ tMinC: null, tMaxC: null, weathercode: null });
   const tz = useMemo(() => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone, [timeZone]);
@@ -131,12 +130,14 @@ export default function WeatherClock({ className, city, lat, lon, clockMode = "a
   const dateStr = useMemo(() => displayNow.toLocaleDateString("fi-FI", { day: "2-digit", month: "2-digit", year: "numeric" }), [displayNow]);
   const Icon = iconForCode(weather.weathercode);
 
-  const timeStyle = tvStyle ? { fontSize: 28 * textScale, fontWeight: 600 } : undefined;
-  const dayStyle = tvStyle ? { fontSize: 12 * textScale } : undefined;
-  const dateStyle = tvStyle ? { fontSize: 12 * textScale } : undefined;
-  const iconSize = tvStyle ? 32 * textScale : 36 * textScale;
-  const tempStyle: React.CSSProperties | undefined = tvStyle ? { fontSize: 14 * textScale } : undefined;
-  const maxTempStyle: React.CSSProperties = { fontSize: `${220 * textScale}%`, lineHeight: 1 };
+  const scaleVar = "var(--preview-text-scale, 1)";
+  const timeStyle = tvStyle ? { fontSize: `calc(28px * ${scaleVar})`, fontWeight: 600 } : undefined;
+  const dayStyle = tvStyle ? { fontSize: `calc(12px * ${scaleVar})` } : undefined;
+  const dateStyle = tvStyle ? { fontSize: `calc(12px * ${scaleVar})` } : undefined;
+  const iconSize: number | string = tvStyle ? `calc(32px * ${scaleVar})` : 36;
+  const maxTempStyle: React.CSSProperties | undefined = tvStyle ? { ...timeStyle } : undefined;
+  const minTempStyle: React.CSSProperties | undefined = tvStyle ? { ...dateStyle } : undefined;
+  const cityStyle: React.CSSProperties | undefined = tvStyle ? { ...dayStyle } : undefined;
   const cityLabel = (city || "").trim() || "Helsinki";
 
   return (
@@ -146,13 +147,13 @@ export default function WeatherClock({ className, city, lat, lon, clockMode = "a
         <div style={timeStyle} className="tabular-nums">{timeStr}</div>
         <div style={dateStyle} className="opacity-70 tabular-nums">{dateStr}</div>
       </div>
-      <div aria-hidden className="flex items-center justify-center">
+      <div aria-hidden className="flex items-center justify-center" style={{ width: iconSize, height: iconSize }}>
         <Icon width={iconSize} height={iconSize} />
       </div>
-      <div style={tempStyle} className="flex flex-col items-center leading-tight text-center tabular-nums">
-        <div className="opacity-70">{cityLabel}</div>
+      <div className="flex flex-col items-center leading-tight text-center tabular-nums">
+        <div style={cityStyle} className="opacity-70">{cityLabel}</div>
         <div style={maxTempStyle}>{formatNumber(weather.tMaxC)} °C</div>
-        <div className="opacity-80">{formatNumber(weather.tMinC)} °C</div>
+        <div style={minTempStyle} className="opacity-80">{formatNumber(weather.tMinC)} °C</div>
       </div>
     </div>
   );

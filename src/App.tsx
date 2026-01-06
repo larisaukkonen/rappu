@@ -72,6 +72,10 @@ export type Hallway = {
 // ---------- Apuja ----------
 const uid = () => Math.random().toString(36).slice(2, 9);
 const apartmentPlaceholder = (level: number, idx: number) => `${level * 100 + idx + 1}`;
+const floorTitle = (floor: Floor) => {
+  const label = (floor.label || "").trim();
+  return label ? label : `Kerros ${floor.level}`;
+};
 const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   id: partial?.id || "demo-hallway",
   name: partial?.name || "Käytävä A",
@@ -237,7 +241,7 @@ function buildStaticTvHtml(h: Hallway): string {
         .join("");
       return (
         `<div class=\"floor\">` +
-        `<div class=\"floor-title\">${escapeHtml(String(floor.level))}. KERROS</div>` +
+        `<div class=\"floor-title\">${escapeHtml(floorTitle(floor))}</div>` +
         `<div class=\"apt-list\">${apartmentsHtml}</div>` +
         `</div>`
       );
@@ -270,7 +274,7 @@ function buildStaticTvHtml(h: Hallway): string {
             .join("");
           return (
             `<div class="floor">` +
-            `<div class="floor-title">${escapeHtml(String(floor.level))}. KERROS</div>` +
+            `<div class="floor-title">${escapeHtml(floorTitle(floor))}</div>` +
             `<div class="apt-list">${apartmentsHtml}</div>` +
             `</div>`
           );
@@ -919,7 +923,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     <div
       className={cn(
         "p-4 lg:p-8 bg-[#dedede]",
-        showPreview ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "flex flex-col items-center gap-6"
+        showPreview ? "grid grid-cols-1 lg:grid-cols-[minmax(500px,2fr)_minmax(0,3fr)] gap-6" : "flex flex-col items-center gap-6"
       )}
     >
       {/* Käynnistyspromptti (overlay) */}
@@ -963,7 +967,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
             </div>
             <div className="flex items-center gap-2">
-              <Label htmlFor="orientation" className="text-sm">Näytön suunta</Label>
+              <Label htmlFor="orientation" className="text-sm font-normal">Suunta</Label>
               <select
                 id="orientation"
                 value={hallway.orientation || "landscape"}
@@ -974,16 +978,32 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 <option value="landscape">Vaaka</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="toggle-preview" className="text-sm">TV-esikatselu</Label>
-              <Switch id="toggle-preview" checked={showPreview} onCheckedChange={setShowPreview} />
-            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <span>Esikatselu</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showPreview}
+                onClick={() => setShowPreview((prev) => !prev)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  showPreview ? "bg-black" : "bg-zinc-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 rounded-full bg-white transition-transform",
+                    showPreview ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </label>
             <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
           </div>
         </div>
       </div>
       {/* Editori (kolumni 1) */}
-      <div className={cn(showPreview ? "" : "w-full max-w-4xl")}>        
+      <div className={cn(showPreview ? "min-w-0 lg:min-w-[500px]" : "w-full max-w-4xl")}>        
         <Card className="shadow-lg">
           <CardHeader className="flex items-center justify-between gap-2">
             <div className="space-y-1">
@@ -1066,7 +1086,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     <div className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-12 md:col-span-6">
                         <Label>Otsikko</Label>
-                        <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder="Kerros 3" />
+                        <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder={`Kerros ${floor.level}`} />
                       </div>
                       <div className="col-span-12 md:col-span-6">
                         <Label>Taso (järjestys)</Label>
@@ -1079,50 +1099,42 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                           <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää asunto</Button>
                         </div>
 
-                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="mt-2 grid grid-cols-1 gap-3">
                           {floor.apartments.map((apt, aptIdx) => (
-                            <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc]">
-                              <div className="grid grid-cols-12 gap-2 items-center">
-                                <div className="col-span-12">
-                                  <Label>Asunnon numero</Label>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1">
-                                      <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full" />
-                                    </div>
-                                    <div>
-                                      <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                                    </div>
-                                  </div>
+                            <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
+                              <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                              <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
+                                <Label>Numero</Label>
+                                <div className="flex items-center justify-between gap-2">
+                                  <Label>Asukkaat (1-2)</Label>
                                 </div>
-
-                                <div className="col-span-12">
-                                  <div className="flex items-center justify-between mt-4 mb-2">
-                                    <Label>Asukkaat (1-2)</Label>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => addTenant(floor.id, apt.id)}
-                                      disabled={apt.tenants.length >= 2}
-                                      className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
-                                      title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunimeä" : undefined}
-                                    >
-                                      <Plus className="h-4 w-4 mr-1"/>
-                                      Lisää sukunimi
-                                    </Button>
-                                  </div>
-
-                                  <div className="space-y-2 mt-1">
-                                    {apt.tenants.map((t) => (
-                                      <div key={t.id} className="flex items-center gap-2">
-                                        <div className="flex-1">
+                                <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full min-w-[50px]" />
+                                <div className="space-y-2">
+                                    {apt.tenants.map((t, tenantIdx) => (
+                                      <div key={t.id} className="flex flex-wrap items-center gap-2">
+                                        <div className="w-full md:w-1/2">
                                           <Input value={t.surname} onChange={(e) => updateTenant(floor.id, apt.id, t.id, { surname: e.target.value })} placeholder="Sukunimi" className="w-full" />
                                         </div>
-                                        <div>
-                                          <button aria-label="Poista sukunimi" title="Poista sukunimi" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                                        </div>
+                                        {tenantIdx > 0 ? (
+                                          <button aria-label="Poista asukas" title="Poista asukas" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                                        ) : (
+                                          <span className="inline-flex items-center justify-center bg-[#c9c9c9] text-zinc-600 rounded-2xl px-[3px] py-1" aria-hidden="true"><Trash2 className="h-4 w-4"/></span>
+                                        )}
+                                        {tenantIdx === 0 && (
+                                          <Button
+                                            size="sm"
+                                            onClick={() => addTenant(floor.id, apt.id)}
+                                            disabled={apt.tenants.length >= 2}
+                                            className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
+                                            title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime?" : undefined}
+                                          >
+                                            <Plus className="h-4 w-4 mr-1"/>
+                                            Lisää asukas
+                                          </Button>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
-                                </div>
                               </div>
                             </div>
                           ))}
@@ -1412,7 +1424,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
       {/* TV-esikatselu (kolumni 2) */}
       {showPreview && (
-        <Card data-preview-card className={cn("shadow-xl", lockClass)} aria-hidden={showStartupPrompt ? "true" : undefined}>
+        <Card data-preview-card className={cn("shadow-xl min-w-0", lockClass)} aria-hidden={showStartupPrompt ? "true" : undefined}>
           <CardHeader className="flex items-center justify-between gap-2">
             <CardTitle className="text-xl flex items-center gap-2">
               <MonitorPlay className="h-5 w-5"/>
@@ -1640,11 +1652,13 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       <div ref={gridRef} style={{ width: "100%", maxWidth: "100%", overflow: "hidden" }}>
         <div
           ref={scaleRootRef}
+          className="tv-text-scale"
           style={{
             width: baseW,
-            transform: `scale(${(gridScale * scaleHint * (hallway.scale ?? 1)).toFixed(3)})`,
+            transform: `scale(${(gridScale * scaleHint).toFixed(3)})`,
             transformOrigin: "top left",
-          }}
+            "--preview-text-scale": hallway.scale ?? 1,
+          } as React.CSSProperties}
         >
           <div className="p-5" style={{ height: baseH, display: "flex", flexDirection: "column" }}>
         <div className="flex items-start justify-between pt-5 px-5">
@@ -1669,8 +1683,8 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
             <div className="vcenter w-full" style={{ paddingLeft: '10%', paddingRight: '10%' }}>
               {floorsAsc.map((floor) => (
-                <div key={floor.id} className="mb-6">
-                  <div className="text-xl font-semibold uppercase mb-3">{floor.level}. KERROS</div>
+                <div key={floor.id} className="mb-6 pb-[15px]">
+                  <div className="text-xl font-semibold uppercase mb-3">{floorTitle(floor)}</div>
                   <div className="flex flex-col gap-3">
                   {floor.apartments.map((apt) => (
                     <div key={apt.id} className="grid grid-cols-[30px_1fr] gap-x-6">
