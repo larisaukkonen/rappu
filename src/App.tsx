@@ -17,7 +17,7 @@ import { FI_MUNICIPALITIES } from "./data/fi-municipalities";
 // const cn = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
- * Asukasnäyttö - hallinta + TV-esikatselu
+ * Asukasnäyttö - Asetukset + TV-esikatselu
  * - Admin vasemmalla, TV-esikatselu oikealla (tai keskitettynä kun esikatselu pois päältä)
  * - Tallennus tuottaa staattisen HTML:n (LG TV) ja yrittää tallettaa sen /api/ruutu -päähän
  * - Käynnistyspromptti: hae talletettu näkymä sarjanumerolla tai aloita tyhjästä
@@ -45,6 +45,16 @@ export type Hallway = {
   orientation?: Orientation; // pysty (1080x1920) tai vaaka (1920x1080)
   serial?: string; // laitteen sarjanumero
   scale?: number;
+  mainScale?: number;
+  headerScale?: number;
+  weatherScale?: number;
+  newsScale?: number;
+  infoScale?: number;
+  logosScale?: number;
+  screenColumns?: number;
+  checkIntervalMinutes?: number;
+  buildingScale?: number;
+  nameScale?: number;
   // Weather and clock settings
   weatherCity?: string;
   weatherLat?: number;
@@ -84,6 +94,12 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   orientation: partial?.orientation || "landscape",
   serial: partial?.serial || "",
   scale: partial?.scale ?? 1,
+  mainScale: partial?.mainScale ?? 1,
+  headerScale: partial?.headerScale ?? 1,
+  weatherScale: partial?.weatherScale ?? 1,
+  newsScale: partial?.newsScale ?? 1,
+  infoScale: partial?.infoScale ?? 1,
+  logosScale: partial?.logosScale ?? 1,
   weatherCity: partial?.weatherCity || "",
   weatherLat: partial?.weatherLat,
   weatherLon: partial?.weatherLon,
@@ -101,6 +117,10 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   logosBgColor: partial?.logosBgColor || "",
   infoEnabled: partial?.infoEnabled ?? false,
   infoHtml: partial?.infoHtml || "",
+  screenColumns: typeof partial?.screenColumns === "number" ? partial?.screenColumns : 1,
+  checkIntervalMinutes: typeof partial?.checkIntervalMinutes === "number" ? partial?.checkIntervalMinutes : 5,
+  buildingScale: partial?.buildingScale ?? 1,
+  nameScale: partial?.nameScale ?? 1,
   floors: partial?.floors || [],
 });
 
@@ -170,6 +190,29 @@ function buildColumnsShared(items: Floor[], orientation: Orientation): Floor[][]
   return out;
 }
 
+function MiniScaleControl({
+  value,
+  onChange,
+  ariaLabel,
+  disabled,
+}: {
+  value?: number;
+  onChange: (value: number) => void;
+  ariaLabel?: string;
+  disabled?: boolean;
+}) {
+  const scale = typeof value === "number" && isFinite(value) ? value : 1;
+  const dec = () => onChange(Math.max(0.5, Math.round(((scale - 0.05) * 100)) / 100));
+  const inc = () => onChange(Math.min(2, Math.round(((scale + 0.05) * 100)) / 100));
+  return (
+    <div className="flex items-center gap-2" aria-label={ariaLabel}>
+      <Button type="button" variant="secondary" onClick={dec} disabled={disabled}>-</Button>
+      <div className="w-14 text-center tabular-nums">{Math.round(scale * 100)}%</div>
+      <Button type="button" variant="secondary" onClick={inc} disabled={disabled}>+</Button>
+    </div>
+  );
+}
+
 // Polku ruudun julkaisuihin
 const RUUTU_DIR = "ruutu";
 
@@ -217,79 +260,75 @@ function sanitizeInfoHtml(html: string): string {
 
 function buildStaticTvHtml(h: Hallway): string {
   const orientation: Orientation = h.orientation || "landscape";
-  const floorsAsc = [...h.floors].sort((a, b) => b.level - a.level);
-  const floorsHtml = floorsAsc
-    .map((floor) => {
-      const apartmentsHtml = floor.apartments
-        .map((apt) => {
-          const tenants = (apt.tenants || [])
-            .filter((t) => t && t.surname && t.surname.trim().length > 0)
-            .map((t) => escapeHtml(t.surname.toUpperCase()));
-          const first = tenants[0] || '<span class="empty">(tyhjä)</span>';
-          const rest = tenants.slice(1).map((n) => `<div class=\"apt-name\">${n}</div>`).join("");
-          const numberHtml = escapeHtml(apt.number || "-");
-          return (
-            `<div class=\"apt-row\">` +
-            `<div class=\"apt-num\">${numberHtml}</div>` +
-            `<div class=\"apt-names\">` +
-            `<div class=\"apt-name\">${first}</div>` +
-            `${rest}` +
-            `</div>` +
-            `</div>`
-          );
-        })
-        .join("");
-      return (
-        `<div class=\"floor\">` +
-        `<div class=\"floor-title\">${escapeHtml(floorTitle(floor))}</div>` +
-        `<div class=\"apt-list\">${apartmentsHtml}</div>` +
-        `</div>`
-      );
-    })
-    .join("");
-  const cols = buildColumnsShared(floorsAsc, orientation);
+  const buildId = Date.now();
+  const floorsAsc = [...h.floors].sort((a, b) => a.level - b.level);
+  const maxColumns = Math.min(3, Math.max(1, Math.floor(h.screenColumns ?? 1)));
+  const totalFloors = floorsAsc.length;
+  const columnsCount = Math.min(maxColumns, Math.max(1, totalFloors));
+  const columns: Floor[][] = [];
 
-  const columnsHtml = cols
-    .map((col) => {
-      const floorsHtml = col
-        .map((floor) => {
-          const apartmentsHtml = floor.apartments
-            .map((apt) => {
-              const tenants = (apt.tenants || [])
-                .filter((t) => t && t.surname && t.surname.trim().length > 0)
-                .map((t) => escapeHtml(t.surname.toUpperCase()));
-              const first = tenants[0] || '<span class="empty">(tyhjä)</span>';
-              const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
-              const numberHtml = escapeHtml(apt.number || "-");
-              return (
-                `<div class="apt-row">` +
-                `<div class="apt-num">${numberHtml}</div>` +
-                `<div class="apt-names">` +
-                `<div class="apt-name">${first}</div>` +
-                `${rest}` +
-                `</div>` +
-                `</div>`
-              );
-            })
-            .join("");
-          return (
-            `<div class="floor">` +
-            `<div class="floor-title">${escapeHtml(floorTitle(floor))}</div>` +
-            `<div class="apt-list">${apartmentsHtml}</div>` +
-            `</div>`
-          );
-        })
-        .join("");
-      return `<div class="col"><div class="vcenter inner-pad">${floorsHtml}</div></div>`;
-    })
-    .join("");
+  if (columnsCount === 1) {
+    columns.push(floorsAsc.slice().reverse());
+  } else {
+    const base = Math.floor(totalFloors / columnsCount);
+    const extra = totalFloors % columnsCount;
+    let index = 0;
+    for (let col = 0; col < columnsCount; col++) {
+      const take = base + (col < extra ? 1 : 0);
+      columns.push(floorsAsc.slice(index, index + take).reverse());
+      index += take;
+    }
+  }
+
+  const renderFloor = (floor: Floor) => {
+    const apartmentsHtml = floor.apartments
+      .map((apt) => {
+        const tenants = (apt.tenants || [])
+          .filter((t) => t && t.surname && t.surname.trim().length > 0)
+          .map((t) => escapeHtml(t.surname.toUpperCase()));
+        const first = tenants[0] || '<span class="empty">(tyhja)</span>';
+        const rest = tenants.slice(1).map((n) => `<div class="apt-name">${n}</div>`).join("");
+        return (
+          `<div class="apt-row">` +
+          `<div class="apt-num">${escapeHtml(apt.number || "-")}</div>` +
+          `<div class="apt-names">` +
+          `<div class="apt-name">${first}</div>` +
+          `${rest}` +
+          `</div>` +
+          `</div>`
+        );
+      })
+      .join("");
+    return (
+      `<div class="floor">` +
+      `<div class="floor-title">${escapeHtml(floorTitle(floor))}</div>` +
+      `<div class="apt-list">${apartmentsHtml}</div>` +
+      `</div>`
+    );
+  };
+
+  const floorsHtml =
+    columns.length > 1
+      ? `<div class="floors-columns">${columns
+          .map((col) => `<div class="floors-col">${col.map(renderFloor).join("")}</div>`)
+          .join("")}</div>`
+      : columns[0].map(renderFloor).join("");
 
   const baseW = orientation === "portrait" ? 1080 : 1920;
-  const baseH = orientation === "portrait" ? 1920 : 1080;
+  const contentHeight = orientation === "portrait" ? 1920 : 1080;
+
   const logosAll = (h.logos || []).filter((l) => l && l.url);
   const logosLimit = typeof h.logosLimit === "number" && h.logosLimit > 0 ? Math.floor(h.logosLimit) : null;
   const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
-  const logosHeight = 130;
+
+  const mainScale = typeof h.mainScale === "number" && isFinite(h.mainScale) ? h.mainScale : 1;
+  const headerScale = typeof h.headerScale === "number" && isFinite(h.headerScale) ? h.headerScale : 1;
+  const weatherScale = typeof h.weatherScale === "number" && isFinite(h.weatherScale) ? h.weatherScale : 1;
+  const newsScale = typeof h.newsScale === "number" && isFinite(h.newsScale) ? h.newsScale : 1;
+  const infoScale = typeof h.infoScale === "number" && isFinite(h.infoScale) ? h.infoScale : 1;
+  const logosScale = typeof h.logosScale === "number" && isFinite(h.logosScale) ? h.logosScale : 1;
+  const logosHeight = 130 * logosScale;
+
   const logosBg = (h.logosBgColor || "").trim();
   const logosBgStyle = logosBg ? ` style="background:${escapeHtml(logosBg)}"` : "";
   const logosHtml = h.logosEnabled && logos.length
@@ -297,53 +336,63 @@ function buildStaticTvHtml(h: Hallway): string {
          <div class="logos-track" id="logos-track">
            ${logos
              .map(
-               (l) =>
-                 `<div class="logo-item">` +
-                 `<img class="logo-img" src="${escapeHtml(l.url)}" alt="${escapeHtml(l.name || "Logo")}"/>` +
-                 `<div class="logo-name">${escapeHtml(l.name || "")}</div>` +
-                 `</div>`
+               (logo) =>
+                 `<div class="logo-item"><img class="logo-img" src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.name || "Logo")}"/><div class="logo-name">${escapeHtml(logo.name || "")}</div></div>`
              )
              .join("")}
          </div>
        </div>`
     : "";
+
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
 #header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px}
-#brand .title{font-size:28px;font-weight:600;letter-spacing:.02em}
-#brand .subtitle{opacity:.7;margin-top:-4px;font-size:14px}
+#brand .title{font-size:calc(28px * var(--header-scale, 1));font-weight:600;letter-spacing:.02em}
+#brand .subtitle{opacity:.7;margin-top:-4px;font-size:calc(14px * var(--header-scale, 1))}
 #clock{display:flex;align-items:center;gap:16px}
-#clock .time{font-size:28px;font-weight:600}
-#clock .date{font-size:12px;opacity:.7}
-#clock .temps{font-size:14px;line-height:1.1}
-#clock .icon{width:32px;height:32px}
-#content{position:relative;padding:20px;transform-origin:top left;display:flex;flex-direction:column;height:${baseH}px}
+#clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
+#clock .date{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
+#clock .temps{font-size:calc(14px * var(--clock-scale, 1));line-height:1.1}
+#clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
+#clock .icon svg{width:100%;height:100%}
+#content{position:relative;padding:20px;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
 #main{flex:1;display:flex;align-items:stretch}
 .cols{display:flex;gap:32px;align-items:stretch}
 .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .col > .vcenter{margin:auto 0}
 .inner-pad{padding-left:10%;padding-right:10%}
+.floors-columns{display:flex;gap:32px;align-items:stretch}
+.floors-col{flex:1;min-width:0}
 .cols-1 .col{flex-basis:100%}
 .cols-2 .col{flex-basis:50%}
-.floor{margin-bottom:24px}
-.floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:22px}
-.apt-row{display:flex;gap:24px;margin:6px 0}
-.apt-num{width:30px;font-weight:700;font-variant-numeric:tabular-nums}
-.apt-names{flex:1}
-.apt-name{font-weight:700;font-size:14px;line-height:1.1}
+.floor{margin-bottom:24px;padding-bottom:15px}
+.floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:calc(22px * var(--main-scale, 1))}
+.apt-list{display:flex;flex-direction:column;gap:12px}
+.apt-row{display:grid;grid-template-columns:30px 1fr;column-gap:24px}
+.apt-num{font-weight:700;font-variant-numeric:tabular-nums;font-size:calc(14px * var(--main-scale, 1))}
+.apt-names{min-width:0}
+.apt-name{font-weight:700;font-size:calc(14px * var(--main-scale, 1));line-height:1.4286}
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
-.info-content p:empty::before{content:'\\00a0';display:inline-block}
+.info-content p:empty::before{content:'\\u00a0';display:inline-block}
 #news{margin-top:0}
-#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:18px}
+#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:calc(18px * var(--news-scale, 1))}
 #news .news-list{display:flex;flex-direction:column;gap:10px}
-#news .news-item{display:flex;gap:8px;font-size:14px;line-height:1.2}
-#news .news-num{font-weight:700}
+#news .news-item{display:flex;gap:8px;font-size:calc(14px * var(--news-scale, 1));line-height:1.2}
+#news .news-num{font-weight:700;background:#fff;color:#000;padding:4px;display:block;border-radius:6px;margin-right:5px}
 #news .news-text{display:flex;flex-direction:column;gap:2px}
-#news .news-cat{font-weight:700;font-size:120%}
+#news .news-cat{font-weight:700;text-transform:uppercase;padding:2px 0;font-size:120%}
 #news .news-title{font-weight:400;font-size:100%}
-#news + .info-content{margin-top:24px}
+#news + .info-content{margin-top:24px;font-size:calc(16px * var(--info-scale, 1))}
+.info-content{font-size:calc(16px * var(--info-scale, 1))}
+.info-content h1{font-size:calc(28px * var(--info-scale, 1));font-weight:700;line-height:1.2;margin:.4em 0 .3em}
+.info-content h2{font-size:calc(22px * var(--info-scale, 1));font-weight:700;line-height:1.25;margin:.4em 0 .2em}
+.info-content p{margin:.4em 0}
+.info-content blockquote{border-left:4px solid rgba(255,255,255,0.2);margin:.6em 0;padding-left:12px}
+.info-content ul,.info-content ol{margin:.4em 0 .6em 1.3em}
+.info-content ul{list-style:disc}
+.info-content ol{list-style:decimal}
 #logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:transparent}
 #logos.logos-animate{justify-content:flex-start}
 #logos .logos-track{display:flex;align-items:center;gap:32px;height:100%;width:max-content}
@@ -354,11 +403,12 @@ function buildStaticTvHtml(h: Hallway): string {
 @keyframes logos-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 `;
 
-  const jsonEmbedded = JSON.stringify(h).replace(/</g, "\\u003c");
-  const infoHtml = (h.infoEnabled && (h.infoHtml || "").trim()) ? sanitizeInfoHtml(h.infoHtml || "") : "";
+  const jsonEmbedded = JSON.stringify(h).replace(/</g, "\u003c");
+  const infoHtml = h.infoEnabled && (h.infoHtml || "").trim() ? sanitizeInfoHtml(h.infoHtml || "") : "";
   const newsEnabled = !!h.newsEnabled && (h.newsRssUrl || "").trim().length > 0;
   const newsLimit = typeof h.newsLimit === "number" && h.newsLimit > 0 ? Math.floor(h.newsLimit) : null;
-  const html = `<!doctype html>
+
+  return `<!doctype html>
 <html lang="fi">
 <head>
 <meta charset="utf-8"/>
@@ -370,10 +420,11 @@ function buildStaticTvHtml(h: Hallway): string {
 <meta http-equiv="cache-control" content="no-cache"/>
 <meta http-equiv="expires" content="0"/>
 <title>${escapeHtml(h.building || "Rakennus")} - ${escapeHtml(h.name)}</title>
+<meta name="build-id" content="${buildId}"/>
 <style>${css}</style>
 </head>
-<body data-scale="${Number(h.scale ?? 1)}">
-  <div id="container">
+<body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
+  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};">
     <div id="header">
       <div id="brand">
         <div class="title">${escapeHtml(h.building || "Rakennus")}</div>
@@ -392,18 +443,18 @@ function buildStaticTvHtml(h: Hallway): string {
         </div>
       </div>` : ""}
     </div>
-    <div id="content" style="width:${'${'}baseW${'}'}px">
+    <div id="content" style="width:${baseW}px">
       <div id="main">
-        <div class="cols ${(infoHtml || newsEnabled) ? 'cols-2' : 'cols-1'}">
+        <div class="cols ${infoHtml || newsEnabled ? "cols-2" : "cols-1"}">
           <div class="col col-main">
             <div class="inner-pad">
               ${floorsHtml}
             </div>
           </div>
-          ${(infoHtml || newsEnabled) ? `<div class="col col-info"><div class="inner-pad">
-            ${newsEnabled ? `<div id="news"><div class="news-title">Uutiset</div><div class="news-list" id="news-list"></div></div>` : ``}
-            ${infoHtml ? `<div class="info-content">${infoHtml}</div>` : ``}
-          </div></div>` : ``}
+          ${infoHtml || newsEnabled ? `<div class="col col-info"><div class="inner-pad">
+            ${newsEnabled ? '<div id="news"><div class="news-title">Uutiset</div><div class="news-list" id="news-list"></div></div>' : ""}
+            ${infoHtml ? `<div class="info-content">${infoHtml}</div>` : ""}
+          </div></div>` : ""}
         </div>
       </div>
       ${logosHtml}
@@ -413,15 +464,17 @@ function buildStaticTvHtml(h: Hallway): string {
   
 <script>(function(){
   var USER_SCALE = ${Number(h.scale ?? 1)};
+  var BUILD_ID = ${buildId};
+  var CHECK_INTERVAL_MIN = ${Math.min(100, Math.max(1, Math.floor(h.checkIntervalMinutes ?? 5)))};
   var CLOCK_MODE = ${JSON.stringify(h.clockMode || "auto")};
   var CLOCK_DATE = ${JSON.stringify(h.clockDate || "")};
   var CLOCK_TIME = ${JSON.stringify(h.clockTime || "")};
   var CITY = ${JSON.stringify(h.weatherCity || "")};
-  var LAT = ${typeof h.weatherLat === 'number' ? h.weatherLat : 'null'};
-  var LON = ${typeof h.weatherLon === 'number' ? h.weatherLon : 'null'};
-  var NEWS_ENABLED = ${newsEnabled ? 'true' : 'false'};
+  var LAT = ${typeof h.weatherLat === "number" ? h.weatherLat : "null"};
+  var LON = ${typeof h.weatherLon === "number" ? h.weatherLon : "null"};
+  var NEWS_ENABLED = ${newsEnabled ? "true" : "false"};
   var NEWS_URL = ${JSON.stringify((h.newsRssUrl || "").trim())};
-  var NEWS_LIMIT = ${newsLimit ? newsLimit : 'null'};
+  var NEWS_LIMIT = ${newsLimit ?? "null"};
   function fit(){
     var C=document.getElementById('container');
     var H=document.getElementById('header');
@@ -455,90 +508,82 @@ function buildStaticTvHtml(h: Hallway): string {
   }
   function setTemps(tmax,tmin){
     var a=document.getElementById('tmax'); var b=document.getElementById('tmin');
-    if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '–') + ' °C';
-    if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '–') + ' °C';
+    if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '?') + ' ?C';
+    if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '?') + ' ?C';
   }
   function iconFor(code){
     // Minimal inline SVG icons to avoid external deps
-    var sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>';
-    var cloud = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 18Z" fill="currentColor"/></svg>';
-    var rain = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 14Z" fill="currentColor"/><path d="M8 16l-1 3M12 16l-1 3M16 16l-1 3"/></svg>';
-    var snow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32" stroke-linecap="round"><path d="M12 4v16M7 7l10 10M17 7L7 17"/></svg>';
-    var fog = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M3 16h18M5 19h14"/></svg>';
-    var thunder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32" stroke-linejoin="round"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M13 13l-3 6h3l-1 4 4-7h-3l1-3z"/></svg>';
+    var sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>';
+    var cloud = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 18Z" fill="currentColor"/></svg>';
+    var rain = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 14Z" fill="currentColor"/><path d="M8 16l-1 3M12 16l-1 3M16 16l-1 3"/></svg>';
+    var snow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v16M7 7l10 10M17 7L7 17"/></svg>';
+    var fog = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M3 16h18M5 19h14"/></svg>';
+    var thunder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 12h10a4 4 0 0 0 0-8 6 6 0 0 0-11.3-1.9A4 4 0 0 0 7 12Z" fill="currentColor"/><path d="M13 13l-3 6h3l-1 4 4-7h-3l1-3z"/></svg>';
     if(code==null) return cloud;
     if(code===0) return sun;
-    if([1,2,3].includes(code)) return cloud;
-    if([45,48].includes(code)) return fog;
-    if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return rain;
-    if([71,73,75,77,85,86].includes(code)) return snow;
-    if([95,96,99].includes(code)) return thunder;
+    if([1,2,3].indexOf(code)>-1) return cloud;
+    if([45,48].indexOf(code)>-1) return fog;
+    if([51,53,55,56,57,61,63,65,66,67,80,81,82].indexOf(code)>-1) return rain;
+    if([71,73,75,77,85,86].indexOf(code)>-1) return snow;
+    if([95,96,99].indexOf(code)>-1) return thunder;
     return cloud;
   }
-  async function resolveCoords(){
-    if(typeof LAT==='number' && typeof LON==='number') return {lat:LAT, lon:LON};
-    if(CITY){
-      try{
-        var u=new URL('https://geocoding-api.open-meteo.com/v1/search');
-        u.searchParams.set('name', CITY); u.searchParams.set('count','1'); u.searchParams.set('language','fi'); u.searchParams.set('format','json');
-        var r=await fetch(u.toString(), {cache:'no-store'});
-        if(r.ok){ var j=await r.json(); var g=j&&j.results&&j.results[0]; if(g) return {lat:g.latitude, lon:g.longitude}; }
-      }catch(e){}
-    }
-    // Default to Helsinki if nothing set
-    return { lat: 60.1699, lon: 24.9384 };
+  function setIcon(code){
+    var w=document.getElementById('wxicon');
+    if(!w) return; w.innerHTML = iconFor(code);
   }
-  async function loadWeather(){
-    try{
-      var c = await resolveCoords();
-      if(!c) { setTemps(NaN, NaN); return; }
-      var w = new URL('https://api.open-meteo.com/v1/forecast');
-      w.searchParams.set('latitude', String(c.lat)); w.searchParams.set('longitude', String(c.lon));
-      w.searchParams.set('daily','temperature_2m_max,temperature_2m_min,weathercode'); w.searchParams.set('timezone','auto');
-      var res = await fetch(w.toString(), {cache:'no-store'});
-      if(!res.ok) throw new Error('weather');
-      var d = await res.json();
-      var i=0; var tMax = d&&d.daily&&d.daily.temperature_2m_max? d.daily.temperature_2m_max[i]: null; var tMin = d&&d.daily&&d.daily.temperature_2m_min? d.daily.temperature_2m_min[i]: null; var code = d&&d.daily&&d.daily.weathercode? d.daily.weathercode[i]: null;
-      setTemps(tMax, tMin);
-      var ic=document.getElementById('wxicon'); if(ic) ic.innerHTML = iconFor(code);
-    }catch(e){ setTemps(NaN, NaN); }
+  function resolveUrl(base, params){
+    var u = new URL(base);
+    for(var k in params) u.searchParams.set(k, params[k]);
+    return u.toString();
   }
-  async function loadNews(){
-    if(!NEWS_ENABLED || !NEWS_URL) return;
-    try{
-      var proxyUrl = '/api/rss?url=' + encodeURIComponent(NEWS_URL);
-      var res = await fetch(proxyUrl, { cache:'no-store' });
-      if(!res.ok) throw new Error('news');
-      var text = await res.text();
-      var doc = new DOMParser().parseFromString(text, 'text/xml');
-      var items = Array.prototype.slice.call(doc.querySelectorAll('item'));
-      var entries = items.length ? items : Array.prototype.slice.call(doc.querySelectorAll('entry'));
-      var out = [];
-      for(var i=0;i<entries.length;i++){
-        var el = entries[i];
-        var titleEl = el.querySelector('title');
-        var catEl = el.querySelector('category') || el.querySelector('dc\\\\:subject');
-        var title = titleEl ? titleEl.textContent : '';
-        var cat = '';
-        if(catEl){
-          cat = (catEl.textContent || catEl.getAttribute('term') || '');
-        }
-        if(title){
-          out.push({ title: title.trim(), category: (cat || '').trim() });
-        }
-      }
-      if(NEWS_LIMIT && NEWS_LIMIT > 0) out = out.slice(0, NEWS_LIMIT);
-      var list = document.getElementById('news-list');
-      if(list){
-        list.innerHTML = out.length ? out.map(function(item, idx){
-          var safeTitle = String(item.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          var safeCat = String(item.category || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function loadWeather(){
+    if(!CITY && (LAT===null || LON===null)) { setTemps(null,null); setIcon(null); return; }
+    var geoPromise;
+    if(LAT!==null && LON!==null) geoPromise = Promise.resolve({lat:LAT, lon:LON});
+    else geoPromise = fetch(resolveUrl('https://geocoding-api.open-meteo.com/v1/search',{name:CITY,count:'1',language:'fi',format:'json'}),{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('geo'); return r.json(); })
+      .then(function(d){ var g=d&&d.results&&d.results[0]; if(!g) throw new Error('geo'); return {lat:g.latitude, lon:g.longitude}; });
+    geoPromise.then(function(pos){
+      return fetch(resolveUrl('https://api.open-meteo.com/v1/forecast',{
+        latitude: String(pos.lat),
+        longitude: String(pos.lon),
+        daily: 'temperature_2m_max,temperature_2m_min,weathercode',
+        timezone: 'auto'
+      }),{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('weather'); return r.json(); })
+      .then(function(d){
+        var i=0; var tMax = d&&d.daily&&d.daily.temperature_2m_max? d.daily.temperature_2m_max[i]: null; var tMin = d&&d.daily&&d.daily.temperature_2m_min? d.daily.temperature_2m_min[i]: null; var code = d&&d.daily&&d.daily.weathercode? d.daily.weathercode[i]: null;
+        setTemps(tMax, tMin); setIcon(typeof code === 'number' ? code : null);
+      });
+    }).catch(function(){ setTemps(null,null); setIcon(null); });
+  }
+  function loadNews(){
+    if(!NEWS_ENABLED || !NEWS_URL){return;}
+    fetch('/api/rss?url='+encodeURIComponent(NEWS_URL),{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('news'); return r.text(); })
+      .then(function(t){
+        var xml = new DOMParser().parseFromString(t, 'text/xml');
+        var items = Array.from(xml.querySelectorAll('item'));
+        if(!items.length) items = Array.from(xml.querySelectorAll('entry'));
+        var list = items.map(function(item){
+          var title = (item.querySelector('title')&&item.querySelector('title').textContent||'').trim();
+          var cat = (item.querySelector('category')&&item.querySelector('category').textContent||'').trim();
+          if(!cat){ var el = item.querySelector('dc\:subject'); cat = el? (el.textContent||'').trim(): ''; }
+          if(!cat){ var term = item.querySelector('category')&&item.querySelector('category').getAttribute('term'); cat = (term||'').trim(); }
+          return title ? { title: title, category: cat } : null;
+        }).filter(function(x){ return !!x; });
+        if(NEWS_LIMIT && list.length > NEWS_LIMIT) list = list.slice(0, NEWS_LIMIT);
+        var listEl = document.getElementById('news-list');
+        if(!listEl) return;
+        listEl.innerHTML = list.length ? list.map(function(item, idx){
+          var safeTitle = (item.title||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          var safeCat = (item.category||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
           return '<div class="news-item"><div class="news-num">'+(idx+1)+'.</div><div class="news-text">' +
             (safeCat ? '<div class="news-cat">'+safeCat+'</div>' : '') +
             '<div class="news-title">'+safeTitle+'</div></div></div>';
         }).join('') : '<div class="news-item opacity-60">-</div>';
-      }
-    }catch(e){}
+      }).catch(function(){});
   }
   function setupLogos(){
     try{
@@ -548,34 +593,31 @@ function buildStaticTvHtml(h: Hallway): string {
       var animate = logos.getAttribute('data-animate') === 'true';
       if(!animate) return;
       if(track.scrollWidth <= logos.clientWidth) return;
-      logos.classList.add('logos-animate');
       track.insertAdjacentHTML('beforeend', track.innerHTML);
     }catch(e){}
   }
   window.addEventListener('resize', fit);
   document.addEventListener('DOMContentLoaded', fit);
   setTimeout(fit, 50);
-  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); loadNews(); setupLogos(); });
+  function extractBuildId(html){
+    var m = html.match(/name="build-id" content="(\d+)"/);
+    return m && m[1] ? m[1] : null;
+  }
+  function checkForUpdate(){
+    try{
+      var url = location.pathname + '?raw=1&_=' + Date.now();
+      fetch(url, { cache:'no-store' }).then(function(r){ return r.text(); }).then(function(t){
+        var next = extractBuildId(t);
+        if(next && String(next) !== String(BUILD_ID)) location.reload();
+      }).catch(function(){});
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); loadNews(); setupLogos(); setInterval(checkForUpdate, CHECK_INTERVAL_MIN * 60000); });
 })();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
 </body>
 </html>`;
-  return html;
 }
-
-function downloadStaticHtmlFile(filename: string, html: string) {
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 0);
-}
-
 function parseHallwayFromStaticHtml(html: string): Hallway | null {
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -613,13 +655,15 @@ function openStaticPreviewTab(h: Hallway) {
 // ---------- Pääkomponentti ----------
 export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string }) {
   const [hallway, setHallway] = useState<Hallway>(emptyHallway());
-  const [activeTab, setActiveTab] = useState<"hallinta" | "saa" | "info" | "uutiset" | "mainokset">("hallinta");
+  const [activeTab, setActiveTab] = useState<"hallinta" | "otsikko" | "asunnot" | "saa" | "info" | "uutiset" | "mainokset">("hallinta");
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [showSavedDialog, setShowSavedDialog] = useState<boolean>(false);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const [savedHtml, setSavedHtml] = useState<string>("");
+  const [savedFilename, setSavedFilename] = useState<string>("");
   const [serverSaveWarning, setServerSaveWarning] = useState<string>("");
   const [isCityOpen, setIsCityOpen] = useState<boolean>(false);
   const [logoError, setLogoError] = useState<string>("");
@@ -740,14 +784,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         try {
           setStartupError("");
           const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: 'no-store' });
-          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei läydy tallennettua näyttää.'); return; }
+          if (!res.ok) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.'); return; }
           const text = await res.text();
           const data = parseHallwayFromStaticHtml(text);
-          if (!data) { setStartupError('Antamallasi sarjanumerolla ei läydy tallennettua näyttää.'); return; }
+          if (!data) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.'); return; }
           setHallway({ ...emptyHallway(), ...data, serial });
           setShowStartupPrompt(false);
         } catch {
-          setStartupError('Antamallasi sarjanumerolla ei läydy tallennettua näyttää.');
+          setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.');
         }
       })();
     }
@@ -756,26 +800,26 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const handleStartupFetch = async () => {
     const serial = startupSerial.trim().toUpperCase();
     if (!serial) {
-      setStartupError("Syätä sarjanumero.");
+      setStartupError("Syötä sarjanumero.");
       return;
     }
     try {
       setStartupError("");
       const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
       if (!res.ok) {
-        setStartupError("Antamallasi sarjanumerolla ei läydy tallennettua näyttää.");
+        setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näkymää.");
         return;
       }
       const text = await res.text();
       const data = parseHallwayFromStaticHtml(text);
       if (!data) {
-        setStartupError("Antamallasi sarjanumerolla ei läydy tallennettua näyttää.");
+        setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näkymää.");
         return;
       }
       setHallway({ ...emptyHallway(), ...data, serial });
       setShowStartupPrompt(false);
     } catch (e) {
-      setStartupError("Antamallasi sarjanumerolla ei läydy tallennettua näyttää.");
+      setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näkymää.");
     }
   };
   const handleCreateNew = () => {
@@ -847,7 +891,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const handleSave = async () => {
     const serial = hallway.serial?.trim();
     if (!serial) {
-      setError("Syätä laitteen sarjanumero ennen tallennusta.");
+      setError("Syötä laitteen sarjanumero ennen tallennusta.");
       return;
     }
     try {
@@ -861,21 +905,54 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       if (!saveRes.ok) {
         setServerSaveWarning(
           `Palvelintallennus epäonnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
-            `Loin ja latasin HTML:n paikallisesti - muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV läytää sen.`
+            `Loin ja latasin HTML:n paikallisesti - muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV löytää sen.`
         );
       } else {
         setServerSaveWarning("");
       }
 
-      downloadStaticHtmlFile(fname, html);
-      const absUrl = new URL(relPath, window.location.origin).toString();
-      setSavedUrl(saveRes.ok ? absUrl : null);
+      setSavedHtml(html);
+      setSavedFilename(fname);
+      const absUrl = new URL(relPath, window.location.origin);
+      absUrl.searchParams.set("raw", "1");
+      setSavedUrl(saveRes.ok ? absUrl.toString() : null);
       setShowSavedDialog(true);
       setStatus("Tallennettu");
       setTimeout(() => setStatus(""), 3000);
     } catch (e: any) {
       setStatus("");
       setError(e?.message || "Tallennus epäonnistui");
+    }
+  };
+
+  const handleReload = async () => {
+    const serial = hallway.serial?.trim();
+    if (!serial) {
+      setError("Syötä laitteen sarjanumero ennen latausta.");
+      return;
+    }
+    try {
+      setError("");
+      setStatus("Ladataan...");
+      const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
+      if (!res.ok) {
+        setStatus("");
+        setError("Tallennettua näkymää ei löydy.");
+        return;
+      }
+      const text = await res.text();
+      const data = parseHallwayFromStaticHtml(text);
+      if (!data) {
+        setStatus("");
+        setError("Tallennettua näkymää ei löydy.");
+        return;
+      }
+      setHallway({ ...emptyHallway(), ...data, serial });
+      setStatus("Ladattu");
+      setTimeout(() => setStatus(""), 3000);
+    } catch (e: any) {
+      setStatus("");
+      setError(e?.message || "Lataus epäonnistui");
     }
   };
 
@@ -954,7 +1031,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         <div className="flex items-center justify-between gap-3">
           <div className="text-xl font-semibold">Infovisio</div>
           <div role="tablist" className="flex gap-3">
-            <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Hallinta</button>
+            <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asetukset</button>
+            <button role="tab" aria-selected={activeTab === "otsikko"} onClick={() => setActiveTab("otsikko")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "otsikko" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Otsikkoalue</button>
+            <button role="tab" aria-selected={activeTab === "asunnot"} onClick={() => setActiveTab("asunnot")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "asunnot" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asunnot</button>
             <button role="tab" aria-selected={activeTab === "uutiset"} onClick={() => setActiveTab("uutiset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "uutiset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Uutiset</button>
             <button role="tab" aria-selected={activeTab === "mainokset"} onClick={() => setActiveTab("mainokset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "mainokset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Mainokset</button>
             <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
@@ -998,6 +1077,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
+            <Button onClick={handleReload} disabled={!hallway.serial?.trim()} variant="secondary" className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed">Lataa uudelleen</Button>
             <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
           </div>
         </div>
@@ -1005,11 +1085,23 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       {/* Editori (kolumni 1) */}
       <div className={cn(showPreview ? "min-w-0 lg:min-w-[500px]" : "w-full max-w-4xl")}>        
         <Card className="shadow-lg">
-          <CardHeader className="flex items-center justify-between gap-2">
+          <CardHeader className="flex items-start justify-between gap-2">
             <div className="space-y-1">
               {activeTab === 'hallinta' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - hallinta</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - asetukset</CardTitle>
+                  <p className="text-sm opacity-70">Määritä laitteen asetukset ja tallennusväli. Muutokset näkyvät oikealla esikatselussa.</p>
+                </>
+              )}
+              {activeTab === 'otsikko' && (
+                <>
+                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - otsikkoalue</CardTitle>
+                  <p className="text-sm opacity-70">Muokkaa rakennuksen ja käytävän otsikkoalueen tekstejä sekä zoomia.</p>
+                </>
+              )}
+              {activeTab === 'asunnot' && (
+                <>
+                  <CardTitle className="text-xl flex items-center gap-2"><Hash className="h-5 w-5"/>Asukasnäyttö - asunnot</CardTitle>
                   <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa.</p>
                 </>
               )}
@@ -1038,117 +1130,175 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </>
               )}
             </div>
+            <div className="shrink-0">
+              {activeTab === "hallinta" && (
+                <MiniScaleControl value={hallway.headerScale} onChange={(v) => setHallway((h) => ({ ...h, headerScale: v }))} ariaLabel="Otsikon ja nimen zoom" />
+              )}
+              {activeTab === "otsikko" && (
+                <MiniScaleControl value={hallway.headerScale} onChange={(v) => setHallway((h) => ({ ...h, headerScale: v }))} ariaLabel="Otsikon ja nimen zoom" />
+              )}
+              {activeTab === "asunnot" && (
+                <MiniScaleControl value={hallway.mainScale} onChange={(v) => setHallway((h) => ({ ...h, mainScale: v }))} ariaLabel="Asukaslistan zoom" />
+              )}
+              {activeTab === "saa" && (
+                <MiniScaleControl value={hallway.weatherScale} onChange={(v) => setHallway((h) => ({ ...h, weatherScale: v }))} ariaLabel="Sään zoom" disabled={!hallway.weatherClockEnabled} />
+              )}
+              {activeTab === "uutiset" && (
+                <MiniScaleControl value={hallway.newsScale} onChange={(v) => setHallway((h) => ({ ...h, newsScale: v }))} ariaLabel="Uutisten zoom" disabled={!hallway.newsEnabled} />
+              )}
+              {activeTab === "info" && (
+                <MiniScaleControl value={hallway.infoScale} onChange={(v) => setHallway((h) => ({ ...h, infoScale: v }))} ariaLabel="Info-zoom" disabled={!hallway.infoEnabled} />
+              )}
+              {activeTab === "mainokset" && (
+                <MiniScaleControl value={hallway.logosScale} onChange={(v) => setHallway((h) => ({ ...h, logosScale: v }))} ariaLabel="Logo-zoom" disabled={!hallway.logosEnabled} />
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {activeTab === "hallinta" && (
-            <>
-            {/* Sarjanumero */}
-            <div className="mb-4">
-              <Label htmlFor="device-serial">Uuden laitteen sarjanumero <span className="text-red-600" aria-hidden="true">*</span></Label>
-              <Input
-                id="device-serial"
-                value={hallway.serial || ""}
-                onChange={(e) => setHallway((h) => ({ ...h, serial: e.target.value.toUpperCase() }))}
-                placeholder="LAITTEEN SARJANUMERO"
-                className="uppercase"
-                required
-                aria-required="true"
-              />
-            </div>
+              <>
+                {/* Sarjanumero */}
+                <div className="mb-4">
+                  <Label htmlFor="device-serial">Uuden laitteen sarjanumero <span className="text-red-600" aria-hidden="true">*</span></Label>
+                  <Input
+                    id="device-serial"
+                    value={hallway.serial || ""}
+                    onChange={(e) => setHallway((h) => ({ ...h, serial: e.target.value.toUpperCase() }))}
+                    placeholder="LAITTEEN SARJANUMERO"
+                    className="uppercase"
+                    required
+                    aria-required="true"
+                  />
+                </div>
 
-            {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
-            {status && <div className="mb-3 text-sm text-green-600">{status}</div>}
-            {serverSaveWarning && (
-              <div className="mb-3 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-md p-2">{serverSaveWarning}</div>
+                <div className="mb-4">
+                  <Label htmlFor="check-interval">Tarkistusv?li</Label>
+                  <Input
+                    id="check-interval"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={hallway.checkIntervalMinutes ?? 5}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      const value = Number.isFinite(next) ? Math.min(100, Math.max(1, Math.floor(next))) : 5;
+                      setHallway((h) => ({ ...h, checkIntervalMinutes: value }));
+                    }}
+                    className="w-48"
+                  />
+                  <div className="text-xs opacity-70 mt-1">Minuutteina (1?100). M??ritt?? kuinka usein ruutu tarkistaa uudet muutokset.</div>
+                </div>
+
+                {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
+                {status && <div className="mb-3 text-sm text-green-600">{status}</div>}
+                {serverSaveWarning && (
+                  <div className="mb-3 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-md p-2">{serverSaveWarning}</div>
+                )}
+              </>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              <div>
-                <Label htmlFor="hallway-name">Käytävän nimi</Label>
-                <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porraskäytävä B - itäsiipi" />
-              </div>
-              <div>
-                <Label htmlFor="building-name">Rakennus</Label>
-                <Input id="building-name" value={hallway.building || ""} onChange={(e) => setHallway((h) => ({ ...h, building: e.target.value }))} placeholder="valinnainen" />
-              </div>
-            </div>
+            {activeTab === "otsikko" && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <Label htmlFor="hallway-name">K?yt?v?n nimi</Label>
+                    <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porrask?yt?v? B - it?siipi" />
+                  </div>
+                  <div>
+                    <Label htmlFor="building-name">Rakennus</Label>
+                    <Input id="building-name" value={hallway.building || ""} onChange={(e) => setHallway((h) => ({ ...h, building: e.target.value }))} placeholder="valinnainen" />
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
-              <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää kerros</Button>
-            </div>
+            {activeTab === "asunnot" && (
+              <>
+                <div className="mb-4">
+                  <Label htmlFor="screen-columns">N?yt?n sarakkeet</Label>
+                  <Input
+                    id="screen-columns"
+                    type="number"
+                    min={1}
+                    max={3}
+                    value={hallway.screenColumns ?? 1}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      const value = Number.isFinite(next) ? Math.min(3, Math.max(1, Math.floor(next))) : 1;
+                      setHallway((h) => ({ ...h, screenColumns: value }));
+                    }}
+                    className="w-48"
+                  />
+                </div>
 
-            <ScrollArea className="h-[60vh] pr-2">
-              <div className="space-y-4">
-                {sortedFloors.map((floor) => (
-                  <motion.div key={floor.id} layout className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
-                    <button aria-label="Poista kerros" title="Poista kerros" onClick={() => deleteFloor(floor.id)} className="absolute top-5 right-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                    <div className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-12 md:col-span-6">
-                        <Label>Otsikko</Label>
-                        <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder={`Kerros ${floor.level}`} />
-                      </div>
-                      <div className="col-span-12 md:col-span-6">
-                        <Label>Taso (järjestys)</Label>
-                        <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
-                      </div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
+                  <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis?? kerros</Button>
+                </div>
 
-                      <div className="col-span-12">
-                        <div className="flex items-center justify-between mt-4">
-                          <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
-                          <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää asunto</Button>
-                        </div>
+                <ScrollArea className="h-[60vh] pr-2">
+                  <div className="space-y-4">
+                    {sortedFloors.map((floor) => (
+                      <motion.div key={floor.id} layout className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
+                        <button aria-label="Poista kerros" title="Poista kerros" onClick={() => deleteFloor(floor.id)} className="absolute top-5 right-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                        <div className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-12 md:col-span-6">
+                            <Label>Otsikko</Label>
+                            <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder={`Kerros ${floor.level}`} />
+                          </div>
+                          <div className="col-span-12 md:col-span-6">
+                            <Label>Taso (j?rjestys)</Label>
+                            <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
+                          </div>
 
-                        <div className="mt-2 grid grid-cols-1 gap-3">
-                          {floor.apartments.map((apt, aptIdx) => (
-                            <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
-                              <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                              <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
-                                <Label>Numero</Label>
-                                <div className="flex items-center justify-between gap-2">
-                                  <Label>Asukkaat (1-2)</Label>
-                                </div>
-                                <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full min-w-[50px]" />
-                                <div className="space-y-2">
-                                    {apt.tenants.map((t, tenantIdx) => (
-                                      <div key={t.id} className="flex flex-wrap items-center gap-2">
-                                        <div className="w-full md:w-1/2">
-                                          <Input value={t.surname} onChange={(e) => updateTenant(floor.id, apt.id, t.id, { surname: e.target.value })} placeholder="Sukunimi" className="w-full" />
-                                        </div>
-                                        {tenantIdx > 0 ? (
-                                          <button aria-label="Poista asukas" title="Poista asukas" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                                        ) : (
-                                          <span className="inline-flex items-center justify-center bg-[#c9c9c9] text-zinc-600 rounded-2xl px-[3px] py-1" aria-hidden="true"><Trash2 className="h-4 w-4"/></span>
-                                        )}
-                                        {tenantIdx === 0 && (
-                                          <Button
-                                            size="sm"
-                                            onClick={() => addTenant(floor.id, apt.id)}
-                                            disabled={apt.tenants.length >= 2}
-                                            className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed"
-                                            title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime?" : undefined}
-                                          >
-                                            <Plus className="h-4 w-4 mr-1"/>
-                                            Lisää asukas
-                                          </Button>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                              </div>
+                          <div className="col-span-12">
+                            <div className="flex items-center justify-between mt-4">
+                              <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
+                              <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis?? asunto</Button>
                             </div>
-                          ))}
+
+                            <div className="mt-2 grid grid-cols-1 gap-3">
+                              {floor.apartments.map((apt, aptIdx) => (
+                                <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
+                                  <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                                  <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
+                                    <Label>Numero</Label>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <Label>Asukkaat (1-2)</Label>
+                                    </div>
+                                    <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full min-w-[50px]" />
+                                    <div className="space-y-2">
+                                      {apt.tenants.map((t, tenantIdx) => (
+                                        <div key={t.id} className="flex flex-wrap items-center gap-2">
+                                          <div className="w-full md:w-1/2">
+                                            <Input value={t.surname} onChange={(e) => updateTenant(floor.id, apt.id, t.id, { surname: e.target.value })} placeholder="Sukunimi" className="w-full" />
+                                          </div>
+                                          {tenantIdx > 0 ? (
+                                            <button aria-label="Poista asukas" title="Poista asukas" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                                          ) : (
+                                            <span className="inline-flex items-center justify-center bg-[#c9c9c9] text-zinc-600 rounded-2xl px-[3px] py-1" aria-hidden="true"><Trash2 className="h-4 w-4"/></span>
+                                          )}
+                                          {tenantIdx === 0 && (
+                                            <Button size="sm" onClick={() => addTenant(floor.id, apt.id)} disabled={apt.tenants.length >= 2} className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed" title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime??" : undefined}><Plus className="h-4 w-4 mr-1"/>Lis?? asukas</Button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </ScrollArea>
-            </>
+                      </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+              </>
             )}
 
-            {activeTab === "uutiset" && (
+            
+{activeTab === "uutiset" && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Switch
@@ -1455,6 +1605,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <div className="flex gap-2">
               <Input readOnly value={savedUrl || ""} />
               <Button type="button" onClick={() => savedUrl && navigator.clipboard.writeText(savedUrl)}>Kopioi</Button>
+              <Button type="button" onClick={() => savedHtml && downloadStaticHtmlFile(savedFilename || "ruutu.html", savedHtml)} disabled={!savedHtml}>Lataa</Button>
             </div>
           </div>
           <DialogFooter>
@@ -1469,7 +1620,23 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 // ---------- TV-esikatselun komponentti ----------
 function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const orientation: Orientation = hallway.orientation || "landscape";
-  const floorsAsc = useMemo(() => [...hallway.floors].sort((a, b) => b.level - a.level), [hallway.floors]);
+  const floorsAsc = useMemo(() => [...hallway.floors].sort((a, b) => a.level - b.level), [hallway.floors]);
+  const screenColumns = Math.min(3, Math.max(1, Math.floor(hallway.screenColumns ?? 1)));
+  const columns = useMemo(() => {
+    const total = floorsAsc.length;
+    const count = Math.min(screenColumns, Math.max(1, total));
+    if (count === 1) return [floorsAsc.slice().reverse()];
+    const base = Math.floor(total / count);
+    const extra = total % count;
+    const out: Floor[][] = [];
+    let idx = 0;
+    for (let c = 0; c < count; c++) {
+      const take = base + (c < extra ? 1 : 0);
+      out.push(floorsAsc.slice(idx, idx + take).reverse());
+      idx += take;
+    }
+    return out;
+  }, [floorsAsc, screenColumns]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -1485,7 +1652,13 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const [logosShouldAnimate, setLogosShouldAnimate] = useState(false);
   const [newsItems, setNewsItems] = useState<{ title: string; category: string }[]>([]);
 
-  // No column count verification anymore; we always render a single list column
+  const userScale = typeof hallway.scale === "number" && isFinite(hallway.scale) ? hallway.scale : 1;
+  const mainScale = typeof hallway.mainScale === "number" && isFinite(hallway.mainScale) ? hallway.mainScale : 1;
+  const headerScale = typeof hallway.headerScale === "number" && isFinite(hallway.headerScale) ? hallway.headerScale : 1;
+  const weatherScale = typeof hallway.weatherScale === "number" && isFinite(hallway.weatherScale) ? hallway.weatherScale : 1;
+  const newsScale = typeof hallway.newsScale === "number" && isFinite(hallway.newsScale) ? hallway.newsScale : 1;
+  const infoScale = typeof hallway.infoScale === "number" && isFinite(hallway.infoScale) ? hallway.infoScale : 1;
+  const logosScale = typeof hallway.logosScale === "number" && isFinite(hallway.logosScale) ? hallway.logosScale : 1;
 
   // Laske esikatselulaatikon koko niin, että pysty = vaaka käänteisenä
   useEffect(() => {
@@ -1569,7 +1742,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const newsLimit = typeof hallway.newsLimit === "number" && hallway.newsLimit > 0 ? Math.floor(hallway.newsLimit) : null;
   const baseW = orientation === "portrait" ? 1080 : 1920;
   const baseH = orientation === "portrait" ? 1920 : 1080;
-  const logosHeight = 130;
+  const logosHeight = 130 * logosScale;
   const renderLogos = shouldAnimate ? [...logos, ...logos] : logos;
 
   useEffect(() => {
@@ -1657,64 +1830,73 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             width: baseW,
             transform: `scale(${(gridScale * scaleHint).toFixed(3)})`,
             transformOrigin: "top left",
-            "--preview-text-scale": hallway.scale ?? 1,
+            "--preview-text-scale": userScale,
           } as React.CSSProperties}
         >
           <div className="p-5" style={{ height: baseH, display: "flex", flexDirection: "column" }}>
-        <div className="flex items-start justify-between pt-5 px-5">
-          <div>
-            <div className="text-2xl font-semibold tracking-wide">{hallway.building || "Rakennus"}</div>
-            <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
-          </div>
-          {hallway.weatherClockEnabled && (
-            <WeatherClock
-              tvStyle
-              city={hallway.weatherCity}
-              lat={hallway.weatherLat}
-              lon={hallway.weatherLon}
-              clockMode={hallway.clockMode}
-              manualDate={hallway.clockDate}
-              manualTime={hallway.clockTime}
-            />
-          )}
-        </div>
-
-        <div className="p-5 pt-4 flex-1 flex gap-8 items-stretch">
-          <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
-            <div className="vcenter w-full" style={{ paddingLeft: '10%', paddingRight: '10%' }}>
-              {floorsAsc.map((floor) => (
-                <div key={floor.id} className="mb-6 pb-[15px]">
-                  <div className="text-xl font-semibold uppercase mb-3">{floorTitle(floor)}</div>
-                  <div className="flex flex-col gap-3">
-                  {floor.apartments.map((apt) => (
-                    <div key={apt.id} className="grid grid-cols-[30px_1fr] gap-x-6">
-                      <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
-                      <div className="text-sm font-semibold break-words whitespace-normal">
-                        {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
-                          <span className="opacity-40">(tyhjä)</span>
-                        )}
-                      </div>
-                      {apt.tenants
-                        .filter((t) => t.surname.trim())
-                        .slice(1)
-                        .map((t, idx) => (
-                          <React.Fragment key={idx}>
-                            <div></div>
-                            <div className="text-sm font-semibold break-words whitespace-normal">{t.surname.toUpperCase()}</div>
-                          </React.Fragment>
-                        ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div ref={headerRef} className="flex items-start justify-between pt-5 px-5">
+            <div style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
+              <div className="text-2xl font-semibold tracking-wide">{hallway.building || "Rakennus"}</div>
+              <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
             </div>
+            {hallway.weatherClockEnabled && (
+              <div style={{ "--preview-text-scale": userScale * weatherScale } as React.CSSProperties}>
+                <WeatherClock
+                  tvStyle
+                  city={hallway.weatherCity}
+                  lat={hallway.weatherLat}
+                  lon={hallway.weatherLon}
+                  clockMode={hallway.clockMode}
+                  manualDate={hallway.clockDate}
+                  manualTime={hallway.clockTime}
+                />
+              </div>
+            )}
           </div>
+
+          <div className="p-5 pt-4 flex-1 flex gap-8 items-stretch">
+            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
+              <div
+                className={cn("vcenter w-full", columns.length > 1 ? "flex gap-8" : "")}
+                style={{ paddingLeft: "10%", paddingRight: "10%", "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
+              >
+                {columns.map((column, ci) => (
+                  <div key={`col-${ci}`} className="min-w-0 flex-1">
+                    {column.map((floor) => (
+                      <div key={floor.id} className="mb-6 pb-[15px]">
+                        <div className="text-xl font-semibold uppercase mb-3">{floorTitle(floor)}</div>
+                        <div className="flex flex-col gap-3">
+                          {floor.apartments.map((apt) => (
+                            <div key={apt.id} className="grid grid-cols-[30px_1fr] gap-x-6">
+                              <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
+                              <div className="text-sm font-semibold break-words whitespace-normal">
+                                {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
+                                  <span className="opacity-40">(tyhjä)</span>
+                                )}
+                              </div>
+                              {apt.tenants
+                                .filter((t) => t.surname.trim())
+                                .slice(1)
+                                .map((t, idx) => (
+                                  <React.Fragment key={idx}>
+                                    <div></div>
+                                    <div className="text-sm font-semibold break-words whitespace-normal">{t.surname.toUpperCase()}</div>
+                                  </React.Fragment>
+                                ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           {((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) && (
             <div className="basis-1/2 min-w-0 p-2">
               <div style={{ paddingLeft: '10%', paddingRight: '10%' }}>
                 {newsEnabled && (
-                  <div className="news-block">
+                  <div className="news-block" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
                     <div className="news-title">Uutiset</div>
                     <div className="news-list">
                     {newsItems.length === 0 ? (
@@ -1734,7 +1916,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                   </div>
                 )}
                 {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
-                  <div className={cn("info-content", newsEnabled && "mt-6")} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+                  <div className={cn("info-content", newsEnabled && "mt-6")} style={{ "--preview-text-scale": userScale * infoScale } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
                 )}
               </div>
             </div>
@@ -1763,11 +1945,20 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       </div>
       </div>
 
-      <div ref={footerRef} className="absolute left-0 right-0 bottom-0 text-center text-[10px] opacity-60 pb-1">
-        Esikatselu
-      </div>
     </div>
   );
+}
+
+function downloadStaticHtmlFile(filename: string, html: string) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 

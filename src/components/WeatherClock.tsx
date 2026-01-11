@@ -116,8 +116,13 @@ export default function WeatherClock({ className, city, lat, lon, clockMode = "a
         const res = await fetch(url.toString(), { cache: "no-store" });
         if (!res.ok) throw new Error("weather-http");
         const data = await res.json();
-        const i = 0; const tMax = data?.daily?.temperature_2m_max?.[i] ?? null; const tMin = data?.daily?.temperature_2m_min?.[i] ?? null; const code = data?.daily?.weathercode?.[i] ?? null;
-        if (!cancelled) setWeather({ tMinC: tMin, tMaxC: tMax, weathercode: code });
+        const i = 0;
+        const tMax = data?.daily?.temperature_2m_max?.[i] ?? null;
+        const tMin = data?.daily?.temperature_2m_min?.[i] ?? null;
+        const rawCode = data?.daily?.weathercode?.[i] ?? data?.daily?.weather_code?.[i] ?? null;
+        const code = typeof rawCode === "string" ? Number(rawCode) : rawCode;
+        const safeCode = typeof code === "number" && isFinite(code) ? code : null;
+        if (!cancelled) setWeather({ tMinC: tMin, tMaxC: tMax, weathercode: safeCode });
       } catch { if (!cancelled) setWeather({ tMinC: null, tMaxC: null, weathercode: null }); }
     }
     load(); const hourly = setInterval(load, 60*60*1000); return () => { cancelled = true; clearInterval(hourly); };

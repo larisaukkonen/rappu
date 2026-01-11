@@ -36,8 +36,13 @@ html, body {
   margin: 0.4em 0 0.2em;
 }
 .slate-editable p, .info-content p { margin: 0.4em 0; }
-.slate-editable blockquote, .info-content blockquote {
+.slate-editable blockquote {
   border-left: 4px solid rgba(0,0,0,0.2);
+  margin: 0.6em 0;
+  padding-left: 12px;
+}
+.info-content blockquote {
+  border-left: 4px solid rgba(255,255,255,0.2);
   margin: 0.6em 0;
   padding-left: 12px;
 }
