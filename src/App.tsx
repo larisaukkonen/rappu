@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper } from "lucide-react";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +55,10 @@ export type Hallway = {
   checkIntervalMinutes?: number;
   buildingScale?: number;
   nameScale?: number;
+  apartmentsManual?: boolean;
+  apartmentsExternalUrl?: string;
+  apartmentsExternalLogin?: string;
+  apartmentsExternalPassword?: string;
   // Weather and clock settings
   weatherCity?: string;
   weatherLat?: number;
@@ -89,7 +93,7 @@ const floorTitle = (floor: Floor) => {
 const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   id: partial?.id || "demo-hallway",
   name: partial?.name || "Käytävä A",
-  building: partial?.building || "",
+  building: partial?.building || "Rakennus",
   isActive: partial?.isActive ?? true,
   orientation: partial?.orientation || "landscape",
   serial: partial?.serial || "",
@@ -121,6 +125,10 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   checkIntervalMinutes: typeof partial?.checkIntervalMinutes === "number" ? partial?.checkIntervalMinutes : 5,
   buildingScale: partial?.buildingScale ?? 1,
   nameScale: partial?.nameScale ?? 1,
+  apartmentsManual: partial?.apartmentsManual ?? true,
+  apartmentsExternalUrl: partial?.apartmentsExternalUrl || "",
+  apartmentsExternalLogin: partial?.apartmentsExternalLogin || "",
+  apartmentsExternalPassword: partial?.apartmentsExternalPassword || "",
   floors: partial?.floors || [],
 });
 
@@ -408,6 +416,8 @@ function buildStaticTvHtml(h: Hallway): string {
   const newsEnabled = !!h.newsEnabled && (h.newsRssUrl || "").trim().length > 0;
   const newsLimit = typeof h.newsLimit === "number" && h.newsLimit > 0 ? Math.floor(h.newsLimit) : null;
 
+  const buildingName = (h.building || "").trim();
+
   return `<!doctype html>
 <html lang="fi">
 <head>
@@ -419,7 +429,7 @@ function buildStaticTvHtml(h: Hallway): string {
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="cache-control" content="no-cache"/>
 <meta http-equiv="expires" content="0"/>
-<title>${escapeHtml(h.building || "Rakennus")} - ${escapeHtml(h.name)}</title>
+<title>${escapeHtml(buildingName ? `${buildingName} - ` : "")}${escapeHtml(h.name)}</title>
 <meta name="build-id" content="${buildId}"/>
 <style>${css}</style>
 </head>
@@ -427,19 +437,19 @@ function buildStaticTvHtml(h: Hallway): string {
   <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};">
     <div id="header">
       <div id="brand">
-        <div class="title">${escapeHtml(h.building || "Rakennus")}</div>
+        ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
         <div class="subtitle">${escapeHtml(h.name)}</div>
       </div>
       ${h.weatherClockEnabled ? `
-      <div id="clock" aria-label="Aika, p?iv?m??r? ja s??">
+      <div id="clock" aria-label="Aika, päivämäärä ja sää">
         <div class="td">
           <div id="time" class="time">--.--</div>
           <div id="date" class="date">--.--.----</div>
         </div>
         <div id="wxicon" class="icon" aria-hidden="true"></div>
         <div class="temps">
-          <div id="tmax">? ?C</div>
-          <div id="tmin" class="min">? ?C</div>
+          <div id="tmax">? °C</div>
+          <div id="tmin" class="min">? °C</div>
         </div>
       </div>` : ""}
     </div>
@@ -508,8 +518,8 @@ function buildStaticTvHtml(h: Hallway): string {
   }
   function setTemps(tmax,tmin){
     var a=document.getElementById('tmax'); var b=document.getElementById('tmin');
-    if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '?') + ' ?C';
-    if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '?') + ' ?C';
+    if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '?') + ' °C';
+    if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '?') + ' °C';
   }
   function iconFor(code){
     // Minimal inline SVG icons to avoid external deps
@@ -866,7 +876,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       }
       setHallway((h) => ({ ...h, logos: [...(h.logos || []), ...uploadedLogos] }));
     } catch (e: any) {
-      setLogoError(e?.message || "Logo-upload ep„onnistui");
+      setLogoError(e?.message || "Logo-upload epäonnistui");
     } finally {
       setLogoUploading(false);
     }
@@ -1032,7 +1042,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           <div className="text-xl font-semibold">Infovisio</div>
           <div role="tablist" className="flex gap-3">
             <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asetukset</button>
-            <button role="tab" aria-selected={activeTab === "otsikko"} onClick={() => setActiveTab("otsikko")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "otsikko" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Otsikkoalue</button>
+            <button role="tab" aria-selected={activeTab === "otsikko"} onClick={() => setActiveTab("otsikko")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "otsikko" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Otsikko</button>
             <button role="tab" aria-selected={activeTab === "asunnot"} onClick={() => setActiveTab("asunnot")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "asunnot" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asunnot</button>
             <button role="tab" aria-selected={activeTab === "uutiset"} onClick={() => setActiveTab("uutiset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "uutiset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Uutiset</button>
             <button role="tab" aria-selected={activeTab === "mainokset"} onClick={() => setActiveTab("mainokset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "mainokset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Mainokset</button>
@@ -1077,7 +1087,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
-            <Button onClick={handleReload} disabled={!hallway.serial?.trim()} variant="secondary" className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed">Lataa uudelleen</Button>
+            <Button onClick={handleReload} disabled={!hallway.serial?.trim()} variant="secondary" className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed" title="Lataa tallennetun näytön sisältö kokonaan uudelleen esimerkiksi muutosten tai mahdollisen virheen myötä.">Päivitä</Button>
             <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
           </div>
         </div>
@@ -1089,31 +1099,31 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <div className="space-y-1">
               {activeTab === 'hallinta' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - asetukset</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Settings className="h-5 w-5"/>Asukasnäyttö - Asetukset</CardTitle>
                   <p className="text-sm opacity-70">Määritä laitteen asetukset ja tallennusväli. Muutokset näkyvät oikealla esikatselussa.</p>
                 </>
               )}
               {activeTab === 'otsikko' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - otsikkoalue</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Type className="h-5 w-5"/>Asukasnäyttö - Otsikko</CardTitle>
                   <p className="text-sm opacity-70">Muokkaa rakennuksen ja käytävän otsikkoalueen tekstejä sekä zoomia.</p>
                 </>
               )}
               {activeTab === 'asunnot' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Hash className="h-5 w-5"/>Asukasnäyttö - asunnot</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Building className="h-5 w-5"/>Asukasnäyttö - Asunnot</CardTitle>
                   <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa.</p>
                 </>
               )}
               {activeTab === 'saa' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><MonitorPlay className="h-5 w-5"/>Asukasnäyttö - Sää + aika</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><CloudSun className="h-5 w-5"/>Asukasnäyttö - Sää + aika</CardTitle>
                   <p className="text-sm opacity-70">Määritä ruudulla näkyvä sää paikkakunnan mukaan. Voit käyttää myös automaattista tai manuaalista aikaa ja päivämäärää.</p>
                 </>
               )}
               {activeTab === 'info' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Users className="h-5 w-5"/>Asukasnäyttö - Info</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Info className="h-5 w-5"/>Asukasnäyttö - Info</CardTitle>
                   <p className="text-sm opacity-70">Jos haluat tiedottaa yleisölle jotain, voit tehdä sen ottamalla infoalue käyttöön ja syöttämällä tekstiä ja antamalla sille haluamasi tyylit.</p>
                 </>
               )}
@@ -1125,15 +1135,12 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               )}
               {activeTab === 'mainokset' && (
                 <>
-                  <CardTitle className="text-xl flex items-center gap-2"><Building2 className="h-5 w-5"/>Asukasnäyttö - Mainokset</CardTitle>
+                  <CardTitle className="text-xl flex items-center gap-2"><Megaphone className="h-5 w-5"/>Asukasnäyttö - Mainokset</CardTitle>
                   <p className="text-sm opacity-70">Lisää logot, järjestä ne vetämällä ja määritä näkyvien logoiden määrä.</p>
                 </>
               )}
             </div>
             <div className="shrink-0">
-              {activeTab === "hallinta" && (
-                <MiniScaleControl value={hallway.headerScale} onChange={(v) => setHallway((h) => ({ ...h, headerScale: v }))} ariaLabel="Otsikon ja nimen zoom" />
-              )}
               {activeTab === "otsikko" && (
                 <MiniScaleControl value={hallway.headerScale} onChange={(v) => setHallway((h) => ({ ...h, headerScale: v }))} ariaLabel="Otsikon ja nimen zoom" />
               )}
@@ -1172,7 +1179,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
 
                 <div className="mb-4">
-                  <Label htmlFor="check-interval">Tarkistusv?li</Label>
+                  <Label htmlFor="check-interval">Tarkistusväli</Label>
                   <Input
                     id="check-interval"
                     type="number"
@@ -1186,7 +1193,88 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     }}
                     className="w-48"
                   />
-                  <div className="text-xs opacity-70 mt-1">Minuutteina (1?100). M??ritt?? kuinka usein ruutu tarkistaa uudet muutokset.</div>
+                  <div className="text-xs opacity-70 mt-1">Minuutteina (1-100). Määrittää kuinka usein ruutu tarkistaa uudet muutokset.</div>
+                </div>
+
+                <div className="mb-4">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => savedHtml && downloadStaticHtmlFile(savedFilename || "ruutu.html", savedHtml)}
+                    disabled={!savedHtml}
+                    className="rounded-2xl"
+                  >
+                    Lataa tallennettu HTML
+                  </Button>
+                </div>
+
+                <div className="border-t border-zinc-200 pt-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Switch
+                      id="apartments-manual"
+                      checked={hallway.apartmentsManual ?? true}
+                      onCheckedChange={(v) => setHallway((h) => ({ ...h, apartmentsManual: v }))}
+                    />
+                    <Label htmlFor="apartments-manual">Määritä asunnot manuaalisesti</Label>
+                  </div>
+
+                  {!(hallway.apartmentsManual ?? true) && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div className="md:col-span-3">
+                          <Label htmlFor="apartments-url">Ulkoinen osoite (URI)</Label>
+                          <Input
+                            id="apartments-url"
+                            value={hallway.apartmentsExternalUrl || ""}
+                            onChange={(e) => setHallway((h) => ({ ...h, apartmentsExternalUrl: e.target.value }))}
+                            placeholder="https://example.com/asunnot.json"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="apartments-login">Käyttäjätunnus</Label>
+                          <Input
+                            id="apartments-login"
+                            value={hallway.apartmentsExternalLogin || ""}
+                            onChange={(e) => setHallway((h) => ({ ...h, apartmentsExternalLogin: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="apartments-password">Salasana</Label>
+                          <Input
+                            id="apartments-password"
+                            type="password"
+                            value={hallway.apartmentsExternalPassword || ""}
+                            onChange={(e) => setHallway((h) => ({ ...h, apartmentsExternalPassword: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium mb-2">Esimerkkirakenne (valinnainen: hallway)</div>
+                      <pre className="text-xs bg-zinc-100 border border-zinc-200 rounded-lg p-3 overflow-auto">
+                        <code>{`{
+  "hallway": {
+    "name": "Käytävä A",
+    "floors": [
+      {
+        "name": "Kerros 1",
+        "apartments": [
+          {
+            "number": "101",
+            "tenants": [
+              { "name": "Sukunimi" },
+              { "name": "Sukunimi 2" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}`}</code>
+                      </pre>
+                      <div className="text-xs opacity-70 mt-2">
+                        Jos <code>hallway</code> puuttuu, oletetaan että syöte koskee yhtä käytävää. <code>floors</code>, <code>name</code>, <code>apartments</code>, <code>number</code> ja <code>tenants</code> ovat pakollisia.
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
@@ -1201,12 +1289,12 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                   <div>
-                    <Label htmlFor="hallway-name">K?yt?v?n nimi</Label>
-                    <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porrask?yt?v? B - it?siipi" />
-                  </div>
-                  <div>
                     <Label htmlFor="building-name">Rakennus</Label>
                     <Input id="building-name" value={hallway.building || ""} onChange={(e) => setHallway((h) => ({ ...h, building: e.target.value }))} placeholder="valinnainen" />
+                  </div>
+                  <div>
+                    <Label htmlFor="hallway-name">Käytävän nimi</Label>
+                    <Input id="hallway-name" value={hallway.name} onChange={(e) => setHallway((h) => ({ ...h, name: e.target.value }))} placeholder="esim. Porraskäytävä B - itäsiipi" />
                   </div>
                 </div>
               </>
@@ -1214,8 +1302,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
             {activeTab === "asunnot" && (
               <>
+                {!(hallway.apartmentsManual ?? true) && (
+                  <div className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
+                    Asuntojen manuaalinen määritys pois käytöstä. Jos haluat määrittää asunnot manuaalisesti, aktivoi se Asetukset-välilehdeltä.
+                  </div>
+                )}
+
                 <div className="mb-4">
-                  <Label htmlFor="screen-columns">N?yt?n sarakkeet</Label>
+                  <Label htmlFor="screen-columns">Näytön sarakkeet</Label>
                   <Input
                     id="screen-columns"
                     type="number"
@@ -1231,69 +1325,71 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   />
                 </div>
 
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
-                  <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis?? kerros</Button>
-                </div>
+                <div className={cn(!(hallway.apartmentsManual ?? true) && "opacity-60 pointer-events-none")}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4"/>Kerrokset</h3>
+                    <Button variant="secondary" onClick={addFloor} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää kerros</Button>
+                  </div>
 
-                <ScrollArea className="h-[60vh] pr-2">
-                  <div className="space-y-4">
-                    {sortedFloors.map((floor) => (
-                      <motion.div key={floor.id} layout className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
-                        <button aria-label="Poista kerros" title="Poista kerros" onClick={() => deleteFloor(floor.id)} className="absolute top-5 right-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                        <div className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-12 md:col-span-6">
-                            <Label>Otsikko</Label>
-                            <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder={`Kerros ${floor.level}`} />
-                          </div>
-                          <div className="col-span-12 md:col-span-6">
-                            <Label>Taso (j?rjestys)</Label>
-                            <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
-                          </div>
-
-                          <div className="col-span-12">
-                            <div className="flex items-center justify-between mt-4">
-                              <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
-                              <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lis?? asunto</Button>
+                  <ScrollArea className="h-[60vh] pr-2">
+                    <div className="space-y-4">
+                      {sortedFloors.map((floor) => (
+                        <motion.div key={floor.id} layout className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
+                          <button aria-label="Poista kerros" title="Poista kerros" onClick={() => deleteFloor(floor.id)} className="absolute top-5 right-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                          <div className="grid grid-cols-12 gap-2 items-center">
+                            <div className="col-span-12 md:col-span-6">
+                              <Label>Otsikko</Label>
+                              <Input value={floor.label} onChange={(e) => updateFloor(floor.id, { label: e.target.value })} placeholder={`Kerros ${floor.level}`} />
+                            </div>
+                            <div className="col-span-12 md:col-span-6">
+                              <Label>Taso (järjestys)</Label>
+                              <Input type="number" value={floor.level} onChange={(e) => updateFloor(floor.id, { level: Number(e.target.value) })} />
                             </div>
 
-                            <div className="mt-2 grid grid-cols-1 gap-3">
-                              {floor.apartments.map((apt, aptIdx) => (
-                                <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
-                                  <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                                  <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
-                                    <Label>Numero</Label>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <Label>Asukkaat (1-2)</Label>
-                                    </div>
-                                    <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full min-w-[50px]" />
-                                    <div className="space-y-2">
-                                      {apt.tenants.map((t, tenantIdx) => (
-                                        <div key={t.id} className="flex flex-wrap items-center gap-2">
-                                          <div className="w-full md:w-1/2">
-                                            <Input value={t.surname} onChange={(e) => updateTenant(floor.id, apt.id, t.id, { surname: e.target.value })} placeholder="Sukunimi" className="w-full" />
+                            <div className="col-span-12">
+                              <div className="flex items-center justify-between mt-4">
+                                <h4 className="font-medium flex items-center gap-2"><Hash className="h-4 w-4"/>Asunnot</h4>
+                                <Button size="sm" variant="secondary" onClick={() => addApartment(floor.id)} className="rounded-2xl"><Plus className="h-4 w-4 mr-1"/>Lisää asunto</Button>
+                              </div>
+
+                              <div className="mt-2 grid grid-cols-1 gap-3">
+                                {floor.apartments.map((apt, aptIdx) => (
+                                  <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
+                                    <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                                    <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
+                                      <Label>Numero</Label>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <Label>Asukkaat (1-2)</Label>
+                                      </div>
+                                      <Input value={apt.number} onChange={(e) => updateApartment(floor.id, apt.id, { number: e.target.value })} placeholder={apartmentPlaceholder(floor.level, aptIdx)} className="w-full min-w-[50px]" />
+                                      <div className="space-y-2">
+                                        {apt.tenants.map((t, tenantIdx) => (
+                                          <div key={t.id} className="flex flex-wrap items-center gap-2">
+                                            <div className="w-full md:w-1/2">
+                                              <Input value={t.surname} onChange={(e) => updateTenant(floor.id, apt.id, t.id, { surname: e.target.value })} placeholder="Sukunimi" className="w-full" />
+                                            </div>
+                                            {tenantIdx > 0 ? (
+                                              <button aria-label="Poista asukas" title="Poista asukas" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
+                                            ) : (
+                                              <span className="inline-flex items-center justify-center bg-[#c9c9c9] text-zinc-600 rounded-2xl px-[3px] py-1" aria-hidden="true"><Trash2 className="h-4 w-4"/></span>
+                                            )}
+                                            {tenantIdx === 0 && (
+                                              <Button size="sm" onClick={() => addTenant(floor.id, apt.id)} disabled={apt.tenants.length >= 2} className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed" title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunimeä" : undefined}><Plus className="h-4 w-4 mr-1"/>Lisää asukas</Button>
+                                            )}
                                           </div>
-                                          {tenantIdx > 0 ? (
-                                            <button aria-label="Poista asukas" title="Poista asukas" onClick={() => deleteTenant(floor.id, apt.id, t.id)} className="bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
-                                          ) : (
-                                            <span className="inline-flex items-center justify-center bg-[#c9c9c9] text-zinc-600 rounded-2xl px-[3px] py-1" aria-hidden="true"><Trash2 className="h-4 w-4"/></span>
-                                          )}
-                                          {tenantIdx === 0 && (
-                                            <Button size="sm" onClick={() => addTenant(floor.id, apt.id)} disabled={apt.tenants.length >= 2} className="rounded-2xl bg-[#bbbbbb] border border-[#aaaaaa] text-black hover:bg-[#b0b0b0] disabled:opacity-60 disabled:cursor-not-allowed" title={apt.tenants.length >= 2 ? "Asunnossa on jo 2 sukunime??" : undefined}><Plus className="h-4 w-4 mr-1"/>Lis?? asukas</Button>
-                                          )}
-                                        </div>
-                                      ))}
+                                        ))}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                  ))}
-                </div>
-              </ScrollArea>
+                        </motion.div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
               </>
             )}
 
@@ -1551,7 +1647,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   )}
                 </div>
                 <div className="h-px bg-[#aaaaaa]" />
-                <div className="text-sm opacity-70">Nämä asetukset vaikuttavat esikatseluun ja TV:lle tallennettavaan HTML:ään.</div>
               </div>
             )}
 
@@ -1836,7 +1931,9 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           <div className="p-5" style={{ height: baseH, display: "flex", flexDirection: "column" }}>
           <div ref={headerRef} className="flex items-start justify-between pt-5 px-5">
             <div style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
-              <div className="text-2xl font-semibold tracking-wide">{hallway.building || "Rakennus"}</div>
+              {hallway.building?.trim() ? (
+                <div className="text-2xl font-semibold tracking-wide">{hallway.building}</div>
+              ) : null}
               <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
             </div>
             {hallway.weatherClockEnabled && (
