@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun } from "lucide-react";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun, Copy } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -364,29 +364,29 @@ function buildStaticTvHtml(h: Hallway): string {
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
 #header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px}
-#brand{background:#273c5a}
+#brand{background:transparent}
 #brand .title{font-size:calc(28px * var(--header-scale, 1));font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:calc(14px * var(--header-scale, 1))}
-#clock{display:flex;align-items:center;gap:16px;background:#5a3e27}
+#clock{display:flex;align-items:center;gap:16px}
 #clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
 #clock .date{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
 #clock .temps{font-size:calc(14px * var(--clock-scale, 1));line-height:1.1}
 #clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
 #clock .icon svg{width:100%;height:100%}
 #content{position:relative;padding:0;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
-#main{flex:1;display:flex;align-items:stretch;background:#26423a;overflow:hidden;min-height:0}
-.cols{display:flex;gap:32px;align-items:stretch;min-height:0}
-.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;min-height:0}
+#main{flex:1;display:flex;align-items:stretch;overflow:hidden;min-height:0}
+.cols{display:flex;gap:32px;align-items:stretch;min-height:0;padding:0 20px;flex:1 1 0;width:100%}
+.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;min-height:0;padding:8px}
 .col-main{overflow:hidden}
 .col > .vcenter{margin:auto 0}
-.inner-pad{padding-left:10%;padding-right:10%}
-.inner-pad-info{display:flex;flex-direction:column;height:100%;flex:1}
+.inner-pad{padding-left:0;padding-right:0}
+.inner-pad-info{display:flex;flex-direction:column;height:100%;flex:1;padding-left:10%;padding-right:10%}
 .inner-pad-info.pin-bottom{padding-bottom:10px}
 .inner-pad-info.pin-bottom #news + .info-content{margin-top:0}
 .inner-pad-info.pin-bottom .info-content{margin-top:0}
 .info-spacer{flex:1}
-.floors-columns{display:flex;gap:32px;align-items:stretch}
-.floors-col{flex:1;min-width:0}
+.floors-columns{display:flex;gap:32px;align-items:stretch;width:100%}
+.floors-col{flex:1 1 0;min-width:0}
 .cols-1 .col{flex-basis:100%}
 .cols-2 .col{flex-basis:50%}
 .floor{margin-bottom:24px;padding-bottom:15px}
@@ -399,16 +399,17 @@ function buildStaticTvHtml(h: Hallway): string {
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
 .info-content p:empty::before{content:'\\u00a0';display:inline-block}
-#news{margin-top:0;background:#4b2a5b}
-#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:calc(var(--news-title-px, 18px) * var(--news-scale, 1))}
+#news{margin-top:0}
+#news > .news-title{font-weight:700;letter-spacing:.04em;margin-bottom:10px;font-size:calc(var(--news-title-px, 18px) * var(--news-scale, 1))}
+.news-item .news-title{font-weight:400;font-size:100%}
 #news .news-list{display:flex;flex-direction:column;gap:10px}
 #news .news-item{display:flex;gap:8px;font-size:calc(14px * var(--news-scale, 1));line-height:1.2}
 #news .news-num{font-weight:700;background:#fff;color:#000;padding:4px;display:block;border-radius:6px;margin-right:5px}
 #news .news-text{display:flex;flex-direction:column;gap:2px}
 #news .news-cat{font-weight:700;text-transform:uppercase;padding:2px 0;font-size:120%}
 #news .news-title{font-weight:400;font-size:100%}
-#news + .info-content{margin-top:24px;font-size:calc(16px * var(--info-scale, 1))}
-.info-content{font-size:calc(16px * var(--info-scale, 1));background:#1e4656}
+#news + .info-content{margin-top:48px;font-size:calc(16px * var(--info-scale, 1))}
+.info-content{font-size:calc(16px * var(--info-scale, 1))}
 .info-content h1{font-size:calc(28px * var(--info-scale, 1));font-weight:400;line-height:1.2;margin:.4em 0 .3em}
 .info-content h2{font-size:calc(22px * var(--info-scale, 1));font-weight:400;line-height:1.25;margin:.4em 0 .2em}
 .info-align-right{text-align:right}
@@ -417,7 +418,7 @@ function buildStaticTvHtml(h: Hallway): string {
 .info-content ul,.info-content ol{margin:.4em 0 .6em 1.3em}
 .info-content ul{list-style:disc}
 .info-content ol{list-style:decimal}
-#logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#4b5a2a}
+#logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
 #logos.logos-animate{justify-content:flex-start}
 #logos .logos-track{display:flex;align-items:center;gap:32px;height:100%;width:max-content}
 #logos .logo-item{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:120px}
@@ -435,6 +436,7 @@ function buildStaticTvHtml(h: Hallway): string {
   const newsTitlePx = typeof h.newsTitlePx === "number" && isFinite(h.newsTitlePx) ? h.newsTitlePx : 36;
   const infoPinBottom = !!h.infoPinBottom;
   const infoAlignRight = !!h.infoAlignRight;
+  const apiOrigin = typeof window !== "undefined" && window.location ? window.location.origin : "";
 
   const buildingName = (h.building || "").trim();
 
@@ -482,7 +484,7 @@ function buildStaticTvHtml(h: Hallway): string {
             </div>
           </div>
           ${infoHtml || newsEnabled ? `<div class="col col-info"><div class="inner-pad inner-pad-info${infoPinBottom ? " pin-bottom" : ""}">
-            ${newsEnabled ? `<div id="news"><div class="news-title">${escapeHtml(newsTitle)}</div><div class="news-list" id="news-list"></div></div>` : ""}
+            ${newsEnabled ? `<div id="news"><div class="news-title" style="font-size:calc(${newsTitlePx}px * var(--news-scale, 1))">${escapeHtml(newsTitle)}</div><div class="news-list" id="news-list"></div></div>` : ""}
             ${infoPinBottom ? `<div class="info-spacer"></div>` : ""}
             ${infoHtml ? `<div class="info-content${infoAlignRight ? " info-align-right" : ""}">${infoHtml}</div>` : ""}
           </div></div>` : ""}
@@ -506,6 +508,7 @@ function buildStaticTvHtml(h: Hallway): string {
   var NEWS_ENABLED = ${newsEnabled ? "true" : "false"};
   var NEWS_URL = ${JSON.stringify((h.newsRssUrl || "").trim())};
   var NEWS_LIMIT = ${newsLimit ?? "null"};
+  var API_ORIGIN = ${JSON.stringify(apiOrigin)};
   function fit(){
     var C=document.getElementById('container');
     var H=document.getElementById('header');
@@ -593,7 +596,8 @@ function buildStaticTvHtml(h: Hallway): string {
   }
   function loadNews(){
     if(!NEWS_ENABLED || !NEWS_URL){return;}
-    fetch('/api/rss?url='+encodeURIComponent(NEWS_URL),{cache:'no-store'})
+    var base = (API_ORIGIN && API_ORIGIN !== 'null') ? API_ORIGIN : '';
+    fetch(base + '/api/rss?url='+encodeURIComponent(NEWS_URL),{cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error('news'); return r.text(); })
       .then(function(t){
         var xml = new DOMParser().parseFromString(t, 'text/xml');
@@ -624,6 +628,8 @@ function buildStaticTvHtml(h: Hallway): string {
       var track = document.getElementById('logos-track');
       if(!logos || !track) return;
       var animate = logos.getAttribute('data-animate') === 'true';
+      if(animate) logos.classList.add('logos-animate');
+      else logos.classList.remove('logos-animate');
       if(!animate) return;
       if(track.scrollWidth <= logos.clientWidth) return;
       track.insertAdjacentHTML('beforeend', track.innerHTML);
@@ -1234,6 +1240,27 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     className="w-48"
                   />
                   <div className="text-xs opacity-70 mt-1">Minuutteina (1-100). Määrittää kuinka usein ruutu tarkistaa uudet muutokset.</div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={savedUrl || ""}
+                      placeholder={"N\u00e4kym\u00e4\u00e4 ei ole tallennettu"}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => savedUrl && navigator.clipboard.writeText(savedUrl)}
+                      disabled={!savedUrl}
+                      className="rounded-2xl"
+                      aria-label="Kopioi URL"
+                      title="Kopioi URL"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="mb-4">
@@ -2030,14 +2057,14 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
         >
           <div style={{ height: baseH, display: "flex", flexDirection: "column" }}>
           <div ref={headerRef} className="flex items-start justify-between mb-12">
-            <div className="bg-sky-800" style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
+            <div style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
               {hallway.building?.trim() ? (
                 <div className="text-2xl font-semibold tracking-wide">{hallway.building}</div>
               ) : null}
               <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
             </div>
             {hallway.weatherClockEnabled && (
-              <div className="bg-orange-800" style={{ "--preview-text-scale": userScale * weatherScale } as React.CSSProperties}>
+              <div style={{ "--preview-text-scale": userScale * weatherScale } as React.CSSProperties}>
                 <WeatherClock
                   tvStyle
                   city={hallway.weatherCity}
@@ -2052,7 +2079,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           </div>
 
           <div className="flex-1 flex gap-8 items-stretch px-5 min-h-0">
-            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex bg-emerald-900 overflow-hidden min-h-0") }>
+            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex overflow-hidden min-h-0") }>
               <div
                 className={cn("vcenter w-full", columns.length > 1 ? "flex gap-8" : "")}
                 style={{ "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
@@ -2096,7 +2123,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                 style={{ paddingLeft: "10%", paddingRight: "10%", paddingBottom: infoPinBottom ? 10 : undefined }}
               >
                 {newsEnabled && (
-                  <div className="news-block bg-fuchsia-900" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
+                  <div className="news-block" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
                     <div
                       className="news-title"
                       style={{ fontSize: `calc(${hallway.newsTitlePx ?? 36}px * var(--preview-text-scale, 1))` }}
@@ -2124,7 +2151,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                 {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
                   <div
                     className={cn(
-                      "info-content bg-cyan-900",
+                      "info-content",
                       !infoPinBottom && newsEnabled && "mt-12",
                       infoAlignRight && "text-right"
                     )}
@@ -2140,7 +2167,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           <div
             ref={logosRef}
             className={cn(
-              "logo-strip w-full overflow-hidden flex bg-lime-800",
+              "logo-strip w-full overflow-hidden flex",
               shouldAnimate ? "logos-animate" : "justify-center"
             )}
             style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent", marginBottom: 10 }}
