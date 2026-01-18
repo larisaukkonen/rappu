@@ -79,6 +79,8 @@ export type Hallway = {
   logosLimit?: number;
   logosEnabled?: boolean;
   logosBgColor?: string;
+  logosSpeed?: number;
+  logosGap?: number;
   // Info panel
   infoEnabled?: boolean;
   infoHtml?: string;
@@ -125,6 +127,8 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   logosLimit: partial?.logosLimit,
   logosEnabled: partial?.logosEnabled ?? false,
   logosBgColor: partial?.logosBgColor || "",
+  logosSpeed: typeof partial?.logosSpeed === "number" ? partial?.logosSpeed : 20,
+  logosGap: typeof partial?.logosGap === "number" ? partial?.logosGap : 32,
   infoEnabled: partial?.infoEnabled ?? false,
   infoHtml: partial?.infoHtml || "",
   infoPinBottom: partial?.infoPinBottom ?? false,
@@ -420,11 +424,11 @@ function buildStaticTvHtml(h: Hallway): string {
 .info-content ol{list-style:decimal}
 #logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
 #logos.logos-animate{justify-content:flex-start}
-#logos .logos-track{display:flex;align-items:center;gap:32px;height:100%;width:max-content}
+#logos .logos-track{display:flex;align-items:center;gap:var(--logos-gap, 32px);height:100%;width:max-content}
 #logos .logo-item{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:120px}
 #logos .logo-img{height:60%;width:auto;max-width:100%;object-fit:contain}
 #logos .logo-name{display:none}
-#logos.logos-animate .logos-track{animation:logos-marquee 20s linear infinite}
+#logos.logos-animate .logos-track{animation:logos-marquee var(--logos-speed, 20s) linear infinite}
 @keyframes logos-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 `;
 
@@ -456,7 +460,7 @@ function buildStaticTvHtml(h: Hallway): string {
 <style>${css}</style>
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
-  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;">
+  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;">
     <div id="header">
       <div id="brand">
         ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
@@ -700,6 +704,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [error, setError] = useState<string>("");
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [showSavedDialog, setShowSavedDialog] = useState<boolean>(false);
+  const [showNoSavedDialog, setShowNoSavedDialog] = useState<boolean>(false);
+  const [showSerialDialog, setShowSerialDialog] = useState<boolean>(false);
+  const [serialInput, setSerialInput] = useState<string>("");
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [savedHtml, setSavedHtml] = useState<string>("");
   const [savedFilename, setSavedFilename] = useState<string>("");
@@ -927,24 +934,22 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const removeLogo = (logoId: string) =>
     setHallway((h) => ({ ...h, logos: (h.logos || []).filter((l) => l.id !== logoId) }));
 
-  const handleSave = async () => {
-    const serial = hallway.serial?.trim();
-    if (!serial) {
-      setError("Syötä laitteen sarjanumero ennen tallennusta.");
-      return;
-    }
+  const saveWithSerial = async (serialOverride?: string) => {
+    const serial = serialOverride ?? hallway.serial?.trim();
+    if (!serial) return;
+    const hallwayToSave = serialOverride ? { ...hallway, serial } : hallway;
     try {
       setError("");
       setStatus("Tallennetaan...");
-      const html = buildStaticTvHtml(hallway);
-      const fname = staticFilenameFor(hallway);
+      const html = buildStaticTvHtml(hallwayToSave);
+      const fname = staticFilenameFor(hallwayToSave);
       const relPath = `/${RUUTU_DIR}/${fname}`;
 
-      const saveRes = await saveRuutu(hallway, html, fname);
+      const saveRes = await saveRuutu(hallwayToSave, html, fname);
       if (!saveRes.ok) {
         setServerSaveWarning(
-          `Palvelintallennus epäonnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
-            `Loin ja latasin HTML:n paikallisesti - muista siirtää tiedosto palvelimelle polkuun ${relPath} jotta TV löytää sen.`
+          `Palvelintallennus ep?onnistui (${saveRes.status ?? ""} ${saveRes.statusText ?? saveRes.error ?? ""}). ` +
+            `Loin ja latasin HTML:n paikallisesti - muista siirt?? tiedosto palvelimelle polkuun ${relPath} jotta TV l?yt?? sen.`
         );
       } else {
         setServerSaveWarning("");
@@ -960,14 +965,24 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       setTimeout(() => setStatus(""), 3000);
     } catch (e: any) {
       setStatus("");
-      setError(e?.message || "Tallennus epäonnistui");
+      setError(e?.message || "Tallennus ep?onnistui");
     }
+  };
+
+  const handleSave = async () => {
+    const serial = hallway.serial?.trim();
+    if (!serial) {
+      setSerialInput(hallway.serial || "");
+      setShowSerialDialog(true);
+      return;
+    }
+    await saveWithSerial();
   };
 
   const handleReload = async () => {
     const serial = hallway.serial?.trim();
-    if (!serial) {
-      setError("Syötä laitteen sarjanumero ennen latausta.");
+    if (!serial || !savedHtml) {
+      setShowNoSavedDialog(true);
       return;
     }
     try {
@@ -976,14 +991,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
       if (!res.ok) {
         setStatus("");
-        setError("Tallennettua näkymää ei löydy.");
+        setError("Tallennetun n?kym?n lataus ep?onnistui.");
         return;
       }
       const text = await res.text();
       const data = parseHallwayFromStaticHtml(text);
       if (!data) {
         setStatus("");
-        setError("Tallennettua näkymää ei löydy.");
+        setError("Tallennettua n?kym?? ei l?ydy.");
         return;
       }
       setHallway({ ...emptyHallway(), ...data, serial });
@@ -991,7 +1006,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       setTimeout(() => setStatus(""), 3000);
     } catch (e: any) {
       setStatus("");
-      setError(e?.message || "Lataus epäonnistui");
+      setError(e?.message || "Lataus ep?onnistui");
     }
   };
 
@@ -1116,12 +1131,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
-            <span className="inline-flex" title={!hallway.serial?.trim() ? "Ei tallennettua näkymää." : "Päivitä näkymä (lataa sivun uudelleen näytöllä)."}>
+            <span className="inline-flex" title={!savedHtml || !hallway.serial?.trim() ? "Ei tallennettua näkymää." : "Päivitä näkymä (lataa sivun uudelleen näytöllä)."}>
             <Button
               onClick={handleReload}
-              disabled={!hallway.serial?.trim()}
               variant="secondary"
-              className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"
+              className={cn(
+                "rounded-2xl px-4",
+                (!savedHtml || !hallway.serial?.trim()) && "text-red-700"
+              )}
             >
               Päivitä
             </Button>
@@ -1129,8 +1146,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <span className="inline-flex" title={!hallway.serial?.trim() ? "Näkymää ei voi tallentaa ilman sarjanumeroa (määritetään Asetukset-välilehdellä)." : "Tallenna näkymä annetulla sarjanumerolla."}>
             <Button
               onClick={handleSave}
-              disabled={!hallway.serial?.trim()}
-              className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"
+              className={cn("rounded-2xl px-4", !hallway.serial?.trim() && "text-red-700")}
             >
               <Save className="h-4 w-4 mr-2"/>Tallenna
             </Button>
@@ -1546,18 +1562,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <Label htmlFor="logos-enabled">Käytössä</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    id="logos-animate"
-                    type="checkbox"
-                    checked={!!hallway.logosAnimate}
-                    onChange={(e) => setHallway((h) => ({ ...h, logosAnimate: e.target.checked }))}
-                  />
-                  <Label htmlFor="logos-animate">Animoi logot</Label>
-                </div>
-
-                <div className="flex items-center gap-2">
                   <div>
-                    <Label>Logoja näkyvissä</Label>
+                    <Label>{"Logoja n\u00e4kyviss\u00e4"}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -1575,7 +1581,41 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
                 <div className="flex items-center gap-2">
                   <div>
-                    <Label>Taustaväri (hex)</Label>
+                    <Label>{"Logo-v\u00e4li (px)"}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={320}
+                      value={hallway.logosGap ?? 32}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        const num = v ? Number(v) : NaN;
+                        setHallway((h) => ({ ...h, logosGap: Number.isFinite(num) ? Math.max(0, num) : undefined }));
+                      }}
+                      disabled={!hallway.logosEnabled}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <Label>Logo-nopeus (s)</Label>
+                    <Input
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={hallway.logosSpeed ?? 20}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        const num = v ? Number(v) : NaN;
+                        setHallway((h) => ({ ...h, logosSpeed: Number.isFinite(num) ? Math.min(120, Math.max(5, num)) : undefined }));
+                      }}
+                      disabled={!hallway.logosEnabled}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <Label>{"Taustav\u00e4ri (hex)"}</Label>
                     <Input
                       value={hallway.logosBgColor || ""}
                       onChange={(e) => setHallway((h) => ({ ...h, logosBgColor: e.target.value.trim() }))}
@@ -1597,13 +1637,22 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     />
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="logos-animate"
+                    type="checkbox"
+                    checked={!!hallway.logosAnimate}
+                    onChange={(e) => setHallway((h) => ({ ...h, logosAnimate: e.target.checked }))}
+                  />
+                  <Label htmlFor="logos-animate">Animoi logot</Label>
+                </div>
 
-                {logoUploading && <div className="text-sm opacity-70">Logoja ladataan...</div>}
+                {logoUploading && <div className="text-sm opacity-70">{"Logoja ladataan..."}</div>}
                 {logoError && <div className="text-sm text-red-600">{logoError}</div>}
-                <div className="text-xs opacity-70">Logoja yhteensä: {(hallway.logos || []).length}/20</div>
+                <div className="text-xs opacity-70">{"Logoja yhteens\u00e4: "}{(hallway.logos || []).length}/20</div>
 
                 {(hallway.logos || []).length === 0 ? (
-                  <div className="text-sm opacity-70">Ei logoja vielä.</div>
+                  <div className="text-sm opacity-70">{"Ei logoja viel\u00e4."}</div>
                 ) : (
                   <div className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3", !hallway.logosEnabled && "opacity-50")}>
                     {(hallway.logos || []).map((logo) => (
@@ -1821,6 +1870,51 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           </div>
           <DialogFooter>
             <Button type="button" onClick={() => setShowSavedDialog(false)}>Sulje</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showNoSavedDialog} onOpenChange={setShowNoSavedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{"P\u00e4ivitys estetty"}</DialogTitle>
+          </DialogHeader>
+          <p>{"Ei tallennettua n\u00e4kym\u00e4\u00e4. Et voi p\u00e4ivitt\u00e4\u00e4 n\u00e4kym\u00e4\u00e4 jota ei ole tallennettu. N\u00e4kym\u00e4n voi tallentaa kun olet antanut laitteen sarjanumeron Asetukset-v\u00e4lilehdell\u00e4."}</p>
+          <DialogFooter>
+            <Button type="button" onClick={() => setShowNoSavedDialog(false)}>Sulje</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showSerialDialog} onOpenChange={setShowSerialDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{"Anna sarjanumero"}</DialogTitle>
+          </DialogHeader>
+          <p>{"Jotta voit tallentaa n\u00e4kym\u00e4n, sinun tulee antaa n\u00e4ytt\u00f6laitteen sarjanumero. N\u00e4kym\u00e4n tallennuksessa k\u00e4ytet\u00e4\u00e4n sarjanumeroa, jonka perusteella n\u00e4ytt\u00f6 pystyy esitt\u00e4m\u00e4\u00e4n siihen tarkoitettua sis\u00e4lt\u00f6\u00e4."}</p>
+          <div className="space-y-3">
+            <Label htmlFor="serial-dialog-input">Sarjanumero</Label>
+            <Input
+              id="serial-dialog-input"
+              value={serialInput}
+              onChange={(e) => setSerialInput(e.target.value.toUpperCase())}
+              placeholder="LAITTEEN SARJANUMERO"
+              className="uppercase"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setShowSerialDialog(false)}>Peruuta</Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const trimmed = serialInput.trim().toUpperCase();
+                if (!trimmed) return;
+                setHallway((h) => ({ ...h, serial: trimmed }));
+                setShowSerialDialog(false);
+                saveWithSerial(trimmed);
+              }}
+              disabled={!serialInput.trim()}
+            >
+              Tallenna
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2172,7 +2266,11 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             )}
             style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent", marginBottom: 10 }}
           >
-            <div ref={logosTrackRef} className="logos-track h-full">
+            <div
+              ref={logosTrackRef}
+              className="logos-track h-full"
+              style={{ gap: typeof hallway.logosGap === "number" ? hallway.logosGap : 32, animationDuration: `${(typeof hallway.logosSpeed === "number" && isFinite(hallway.logosSpeed) ? hallway.logosSpeed : 20)}s` }}
+            >
               {renderLogos.map((logo, idx) => (
                 <div key={`${logo.id}-${idx}`} className="logo-item h-full">
                   <img src={logo.url} alt={logo.name || "Logo"} className="logo-img" />
