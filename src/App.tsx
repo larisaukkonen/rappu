@@ -71,6 +71,8 @@ export type Hallway = {
   newsEnabled?: boolean;
   newsRssUrl?: string;
   newsLimit?: number;
+  newsTitle?: string;
+  newsTitlePx?: number;
   // Logos
   logos?: { id: string; url: string; name?: string }[];
   logosAnimate?: boolean;
@@ -80,6 +82,8 @@ export type Hallway = {
   // Info panel
   infoEnabled?: boolean;
   infoHtml?: string;
+  infoPinBottom?: boolean;
+  infoAlignRight?: boolean;
   floors: Floor[]; // lajiteltu level:n mukaan
 };
 
@@ -114,6 +118,8 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   newsEnabled: partial?.newsEnabled ?? false,
   newsRssUrl: partial?.newsRssUrl || "",
   newsLimit: partial?.newsLimit,
+  newsTitle: partial?.newsTitle || "Uutiset",
+  newsTitlePx: typeof partial?.newsTitlePx === "number" ? partial?.newsTitlePx : 36,
   logos: partial?.logos || [],
   logosAnimate: partial?.logosAnimate ?? false,
   logosLimit: partial?.logosLimit,
@@ -121,6 +127,8 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   logosBgColor: partial?.logosBgColor || "",
   infoEnabled: partial?.infoEnabled ?? false,
   infoHtml: partial?.infoHtml || "",
+  infoPinBottom: partial?.infoPinBottom ?? false,
+  infoAlignRight: partial?.infoAlignRight ?? false,
   screenColumns: typeof partial?.screenColumns === "number" ? partial?.screenColumns : 1,
   checkIntervalMinutes: typeof partial?.checkIntervalMinutes === "number" ? partial?.checkIntervalMinutes : 5,
   buildingScale: partial?.buildingScale ?? 1,
@@ -366,11 +374,17 @@ function buildStaticTvHtml(h: Hallway): string {
 #clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
 #clock .icon svg{width:100%;height:100%}
 #content{position:relative;padding:0;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
-#main{flex:1;display:flex;align-items:stretch;background:#26423a;overflow:hidden}
-.cols{display:flex;gap:32px;align-items:stretch}
-.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+#main{flex:1;display:flex;align-items:stretch;background:#26423a;overflow:hidden;min-height:0}
+.cols{display:flex;gap:32px;align-items:stretch;min-height:0}
+.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;min-height:0}
+.col-main{overflow:hidden}
 .col > .vcenter{margin:auto 0}
 .inner-pad{padding-left:10%;padding-right:10%}
+.inner-pad-info{display:flex;flex-direction:column;height:100%;flex:1}
+.inner-pad-info.pin-bottom{padding-bottom:10px}
+.inner-pad-info.pin-bottom #news + .info-content{margin-top:0}
+.inner-pad-info.pin-bottom .info-content{margin-top:0}
+.info-spacer{flex:1}
 .floors-columns{display:flex;gap:32px;align-items:stretch}
 .floors-col{flex:1;min-width:0}
 .cols-1 .col{flex-basis:100%}
@@ -386,7 +400,7 @@ function buildStaticTvHtml(h: Hallway): string {
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
 .info-content p:empty::before{content:'\\u00a0';display:inline-block}
 #news{margin-top:0;background:#4b2a5b}
-#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:calc(18px * var(--news-scale, 1))}
+#news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:calc(var(--news-title-px, 18px) * var(--news-scale, 1))}
 #news .news-list{display:flex;flex-direction:column;gap:10px}
 #news .news-item{display:flex;gap:8px;font-size:calc(14px * var(--news-scale, 1));line-height:1.2}
 #news .news-num{font-weight:700;background:#fff;color:#000;padding:4px;display:block;border-radius:6px;margin-right:5px}
@@ -395,8 +409,9 @@ function buildStaticTvHtml(h: Hallway): string {
 #news .news-title{font-weight:400;font-size:100%}
 #news + .info-content{margin-top:24px;font-size:calc(16px * var(--info-scale, 1))}
 .info-content{font-size:calc(16px * var(--info-scale, 1));background:#1e4656}
-.info-content h1{font-size:calc(28px * var(--info-scale, 1));font-weight:700;line-height:1.2;margin:.4em 0 .3em}
-.info-content h2{font-size:calc(22px * var(--info-scale, 1));font-weight:700;line-height:1.25;margin:.4em 0 .2em}
+.info-content h1{font-size:calc(28px * var(--info-scale, 1));font-weight:400;line-height:1.2;margin:.4em 0 .3em}
+.info-content h2{font-size:calc(22px * var(--info-scale, 1));font-weight:400;line-height:1.25;margin:.4em 0 .2em}
+.info-align-right{text-align:right}
 .info-content p{margin:.4em 0}
 .info-content blockquote{border-left:4px solid rgba(255,255,255,0.2);margin:.6em 0;padding-left:12px}
 .info-content ul,.info-content ol{margin:.4em 0 .6em 1.3em}
@@ -416,6 +431,10 @@ function buildStaticTvHtml(h: Hallway): string {
   const infoHtml = h.infoEnabled && (h.infoHtml || "").trim() ? sanitizeInfoHtml(h.infoHtml || "") : "";
   const newsEnabled = !!h.newsEnabled && (h.newsRssUrl || "").trim().length > 0;
   const newsLimit = typeof h.newsLimit === "number" && h.newsLimit > 0 ? Math.floor(h.newsLimit) : null;
+  const newsTitle = (h.newsTitle || "Uutiset").trim() || "Uutiset";
+  const newsTitlePx = typeof h.newsTitlePx === "number" && isFinite(h.newsTitlePx) ? h.newsTitlePx : 36;
+  const infoPinBottom = !!h.infoPinBottom;
+  const infoAlignRight = !!h.infoAlignRight;
 
   const buildingName = (h.building || "").trim();
 
@@ -435,7 +454,7 @@ function buildStaticTvHtml(h: Hallway): string {
 <style>${css}</style>
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
-  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};">
+  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;">
     <div id="header">
       <div id="brand">
         ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
@@ -462,9 +481,10 @@ function buildStaticTvHtml(h: Hallway): string {
               ${floorsHtml}
             </div>
           </div>
-          ${infoHtml || newsEnabled ? `<div class="col col-info"><div class="inner-pad">
-            ${newsEnabled ? '<div id="news"><div class="news-title">Uutiset</div><div class="news-list" id="news-list"></div></div>' : ""}
-            ${infoHtml ? `<div class="info-content">${infoHtml}</div>` : ""}
+          ${infoHtml || newsEnabled ? `<div class="col col-info"><div class="inner-pad inner-pad-info${infoPinBottom ? " pin-bottom" : ""}">
+            ${newsEnabled ? `<div id="news"><div class="news-title">${escapeHtml(newsTitle)}</div><div class="news-list" id="news-list"></div></div>` : ""}
+            ${infoPinBottom ? `<div class="info-spacer"></div>` : ""}
+            ${infoHtml ? `<div class="info-content${infoAlignRight ? " info-align-right" : ""}">${infoHtml}</div>` : ""}
           </div></div>` : ""}
         </div>
       </div>
@@ -1047,10 +1067,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asetukset</button>
             <button role="tab" aria-selected={activeTab === "otsikko"} onClick={() => setActiveTab("otsikko")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "otsikko" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Otsikko</button>
             <button role="tab" aria-selected={activeTab === "asunnot"} onClick={() => setActiveTab("asunnot")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "asunnot" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asunnot</button>
+            <button role="tab" aria-selected={activeTab === "saa"} onClick={() => setActiveTab("saa")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "saa" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Sää + aika</button>
             <button role="tab" aria-selected={activeTab === "uutiset"} onClick={() => setActiveTab("uutiset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "uutiset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Uutiset</button>
             <button role="tab" aria-selected={activeTab === "mainokset"} onClick={() => setActiveTab("mainokset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "mainokset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Mainokset</button>
             <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
-            <button role="tab" aria-selected={activeTab === "saa"} onClick={() => setActiveTab("saa")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "saa" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Sää + aika</button>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -1439,6 +1459,35 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     disabled={!hallway.newsEnabled}
                   />
                 </div>
+                <div className="max-w-xs">
+                  <Label htmlFor="news-title">Uutisotsikko</Label>
+                  <Input
+                    id="news-title"
+                    value={hallway.newsTitle ?? "Uutiset"}
+                    onChange={(e) => setHallway((h) => ({ ...h, newsTitle: e.target.value }))}
+                    placeholder="Uutiset"
+                    disabled={!hallway.newsEnabled}
+                  />
+                </div>
+
+                <div className="max-w-xs">
+                  <Label htmlFor="news-title-px">Uutisotsikon koko (px)</Label>
+                  <Input
+                    id="news-title-px"
+                    type="number"
+                    min={8}
+                    value={hallway.newsTitlePx ?? 36}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      const num = v ? Number(v) : NaN;
+                      setHallway((h) => ({
+                        ...h,
+                        newsTitlePx: Number.isFinite(num) && num > 0 ? num : undefined,
+                      }));
+                    }}
+                    disabled={!hallway.newsEnabled}
+                  />
+                </div>
               </div>
             )}
 
@@ -1657,12 +1706,32 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Switch id="info-enabled" checked={!!hallway.infoEnabled} onCheckedChange={(v) => setHallway((h) => ({ ...h, infoEnabled: v }))} />
-                  <Label htmlFor="info-enabled">Käytössä</Label>
+                  <Label htmlFor="info-enabled">{"K\u00e4yt\u00f6ss\u00e4"}</Label>
                 </div>
                 <div>
-                  <Label>Sisältö</Label>
-                  <SlateEditor value={hallway.infoHtml || ""} onChange={(html: string) => setHallway((h) => ({ ...h, infoHtml: html }))} />
-                  <div className="text-sm opacity-60 mt-1">Tallennetaan osaksi TV-näkymää. Skriptit ja tapahtumat poistetaan automaattisesti.</div>
+                  <Label>{"Sis\u00e4lt\u00f6"}</Label>
+                  <SlateEditor
+                    value={hallway.infoHtml || ""}
+                    onChange={(html: string) => setHallway((h) => ({ ...h, infoHtml: html }))}
+                    alignRight={!!hallway.infoAlignRight}
+                  />
+                  <div className="text-sm opacity-60 mt-1">{"Tallennetaan osaksi TV-n\u00e4kym\u00e4\u00e4. Skriptit ja tapahtumat poistetaan automaattisesti."}</div>
+                </div>
+                <div className={cn("flex items-center gap-2", !hallway.infoEnabled && "opacity-50 pointer-events-none")}>
+                  <Switch
+                    id="info-align-right"
+                    checked={!!hallway.infoAlignRight}
+                    onCheckedChange={(v) => setHallway((h) => ({ ...h, infoAlignRight: v }))}
+                  />
+                  <Label htmlFor="info-align-right">{"Tasaa oikealle"}</Label>
+                </div>
+                <div className={cn("flex items-center gap-2", !hallway.infoEnabled && "opacity-50 pointer-events-none")}>
+                  <Switch
+                    id="info-pin-bottom"
+                    checked={!!hallway.infoPinBottom}
+                    onCheckedChange={(v) => setHallway((h) => ({ ...h, infoPinBottom: v }))}
+                  />
+                  <Label htmlFor="info-pin-bottom">{"Kiinnit\u00e4 alas"}</Label>
                 </div>
               </div>
             )}
@@ -1845,6 +1914,8 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
   const shouldAnimate = !!hallway.logosAnimate && logosShouldAnimate && !!hallway.logosEnabled;
   const newsEnabled = !!hallway.newsEnabled && (hallway.newsRssUrl || "").trim().length > 0;
+  const infoPinBottom = !!hallway.infoPinBottom;
+  const infoAlignRight = !!hallway.infoAlignRight;
   const newsLimit = typeof hallway.newsLimit === "number" && hallway.newsLimit > 0 ? Math.floor(hallway.newsLimit) : null;
   const previewScale = gridScale * scaleHint;
   const offsetX = 10;
@@ -1963,8 +2034,8 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             )}
           </div>
 
-          <div className="flex-1 flex gap-8 items-stretch px-5">
-            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex bg-emerald-900 overflow-hidden") }>
+          <div className="flex-1 flex gap-8 items-stretch px-5 min-h-0">
+            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex bg-emerald-900 overflow-hidden min-h-0") }>
               <div
                 className={cn("vcenter w-full", columns.length > 1 ? "flex gap-8" : "")}
                 style={{ "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
@@ -2002,11 +2073,19 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
               </div>
             </div>
           {((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) && (
-            <div className="flex-1 min-w-0 p-2">
-              <div style={{ paddingLeft: '10%', paddingRight: '10%' }}>
+            <div className="flex-1 min-w-0 p-2 flex min-h-0">
+              <div
+                className="flex flex-col min-h-0 h-full"
+                style={{ paddingLeft: "10%", paddingRight: "10%", paddingBottom: infoPinBottom ? 10 : undefined }}
+              >
                 {newsEnabled && (
                   <div className="news-block bg-fuchsia-900" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
-                    <div className="news-title">Uutiset</div>
+                    <div
+                      className="news-title"
+                      style={{ fontSize: `calc(${hallway.newsTitlePx ?? 36}px * var(--preview-text-scale, 1))` }}
+                    >
+                      {hallway.newsTitle?.trim() || "Uutiset"}
+                    </div>
                     <div className="news-list">
                     {newsItems.length === 0 ? (
                       <div className="news-item opacity-60">-</div>
@@ -2024,8 +2103,17 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                     </div>
                   </div>
                 )}
+                {infoPinBottom && <div className="flex-1" />}
                 {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
-                  <div className={cn("info-content bg-cyan-900", newsEnabled && "mt-6")} style={{ "--preview-text-scale": userScale * infoScale } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+                  <div
+                    className={cn(
+                      "info-content bg-cyan-900",
+                      !infoPinBottom && newsEnabled && "mt-12",
+                      infoAlignRight && "text-right"
+                    )}
+                    style={{ "--preview-text-scale": userScale * infoScale } as React.CSSProperties}
+                    dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }}
+                  />
                 )}
               </div>
             </div>
@@ -2038,7 +2126,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
               "logo-strip w-full overflow-hidden flex bg-lime-800",
               shouldAnimate ? "logos-animate" : "justify-center"
             )}
-            style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent" }}
+            style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent", marginBottom: 10 }}
           >
             <div ref={logosTrackRef} className="logos-track h-full">
               {renderLogos.map((logo, idx) => (

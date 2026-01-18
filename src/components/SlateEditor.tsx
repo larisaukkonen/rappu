@@ -18,6 +18,7 @@ export type SlateEditorProps = {
   value: string; // HTML
   onChange: (html: string) => void;
   className?: string;
+  alignRight?: boolean;
 };
 
 const ToolbarButton: React.FC<{ onMouseDown: (e: React.MouseEvent) => void; title: string } & React.PropsWithChildren> = ({ onMouseDown, title, children }) => (
@@ -83,8 +84,8 @@ const nodeToHtml = (node: any): string => {
   }
   const children = node.children.map((c: any) => nodeToHtml(c)).join('');
   switch (node.type) {
-    case 'heading-one': return `<h1>${children}</h1>`;
-    case 'heading-two': return `<h2>${children}</h2>`;
+    case 'heading-one': return `<h1 style="font-weight:400">${children}</h1>`;
+    case 'heading-two': return `<h2 style="font-weight:400">${children}</h2>`;
     case 'block-quote': return `<blockquote>${children}</blockquote>`;
     case 'numbered-list': return `<ol>${children}</ol>`;
     case 'bulleted-list': return `<ul>${children}</ul>`;
@@ -128,8 +129,8 @@ const deserialize = (html: string): Descendant[] => {
 
 const Element = ({ attributes, children, element }: any) => {
   switch (element.type) {
-    case 'heading-one': return <h1 {...attributes}>{children}</h1>;
-    case 'heading-two': return <h2 {...attributes}>{children}</h2>;
+    case 'heading-one': return <h1 {...attributes} style={{ fontWeight: 400 }}>{children}</h1>;
+    case 'heading-two': return <h2 {...attributes} style={{ fontWeight: 400 }}>{children}</h2>;
     case 'block-quote': return <blockquote {...attributes}>{children}</blockquote>;
     case 'numbered-list': return <ol {...attributes}>{children}</ol>;
     case 'bulleted-list': return <ul {...attributes}>{children}</ul>;
@@ -147,7 +148,7 @@ const Leaf = ({ attributes, children, leaf }: any) => {
   return <span {...attributes}>{children}</span>;
 };
 
-export default function SlateEditor({ value, onChange, className }: SlateEditorProps) {
+export default function SlateEditor({ value, onChange, className, alignRight }: SlateEditorProps) {
   const editor = useMemo(() => withHistory(withReact(createEditor() as Editor)), []);
   const [internalValue, setInternalValue] = useState<Descendant[]>(() => deserialize(value));
   const lastHtmlRef = useRef<string>(value);
@@ -202,7 +203,7 @@ export default function SlateEditor({ value, onChange, className }: SlateEditorP
         </div>
         <Editable
           className="p-3 rounded-md bg-white text-black border outline-none focus:ring-2 focus:ring-zinc-300 slate-editable"
-          style={{ minHeight: '14em', lineHeight: '1.4em' }}
+          style={{ minHeight: '14em', lineHeight: '1.4em', textAlign: alignRight ? 'right' : 'left' }}
           renderElement={(p)=> <Element {...p}/>} renderLeaf={(p)=> <Leaf {...p}/>} placeholder="Kirjoita..."
           onKeyDown={(e)=>{
             if (!e.metaKey && !e.ctrlKey) return;
