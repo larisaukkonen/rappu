@@ -1110,8 +1110,25 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
-            <Button onClick={handleReload} disabled={!hallway.serial?.trim()} variant="secondary" className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed" title="Lataa tallennetun näytön sisältö kokonaan uudelleen esimerkiksi muutosten tai mahdollisen virheen myötä.">Päivitä</Button>
-            <Button onClick={handleSave} disabled={!hallway.serial?.trim()} className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"><Save className="h-4 w-4 mr-2"/>Tallenna</Button>
+            <span className="inline-flex" title={!hallway.serial?.trim() ? "Ei tallennettua näkymää." : "Päivitä näkymä (lataa sivun uudelleen näytöllä)."}>
+            <Button
+              onClick={handleReload}
+              disabled={!hallway.serial?.trim()}
+              variant="secondary"
+              className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"
+            >
+              Päivitä
+            </Button>
+            </span>
+            <span className="inline-flex" title={!hallway.serial?.trim() ? "Näkymää ei voi tallentaa ilman sarjanumeroa (määritetään Asetukset-välilehdellä)." : "Tallenna näkymä annetulla sarjanumerolla."}>
+            <Button
+              onClick={handleSave}
+              disabled={!hallway.serial?.trim()}
+              className="rounded-2xl px-4 disabled:bg-zinc-300 disabled:text-zinc-600 disabled:hover:bg-zinc-300 disabled:cursor-not-allowed"
+            >
+              <Save className="h-4 w-4 mr-2"/>Tallenna
+            </Button>
+            </span>
           </div>
         </div>
       </div>
@@ -1991,7 +2008,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       ref={containerRef}
       style={{
         width: boxSize.w || undefined,
-        height: boxSize.h || undefined,
+        height: boxSize.h ? Math.max(0, boxSize.h - 10) : undefined,
         // Center horizontally so left/right spacing inside padded parent is equal
         margin: "0 auto",
         // Never exceed parent content box
