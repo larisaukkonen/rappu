@@ -355,17 +355,18 @@ function buildStaticTvHtml(h: Hallway): string {
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
-#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px}
+#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px}
+#brand{background:#273c5a}
 #brand .title{font-size:calc(28px * var(--header-scale, 1));font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:calc(14px * var(--header-scale, 1))}
-#clock{display:flex;align-items:center;gap:16px}
+#clock{display:flex;align-items:center;gap:16px;background:#5a3e27}
 #clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
 #clock .date{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
 #clock .temps{font-size:calc(14px * var(--clock-scale, 1));line-height:1.1}
 #clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
 #clock .icon svg{width:100%;height:100%}
-#content{position:relative;padding:20px;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
-#main{flex:1;display:flex;align-items:stretch}
+#content{position:relative;padding:0;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
+#main{flex:1;display:flex;align-items:stretch;background:#26423a;overflow:hidden}
 .cols{display:flex;gap:32px;align-items:stretch}
 .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
 .col > .vcenter{margin:auto 0}
@@ -384,7 +385,7 @@ function buildStaticTvHtml(h: Hallway): string {
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
 .info-content p:empty::before{content:'\\u00a0';display:inline-block}
-#news{margin-top:0}
+#news{margin-top:0;background:#4b2a5b}
 #news .news-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-size:calc(18px * var(--news-scale, 1))}
 #news .news-list{display:flex;flex-direction:column;gap:10px}
 #news .news-item{display:flex;gap:8px;font-size:calc(14px * var(--news-scale, 1));line-height:1.2}
@@ -393,7 +394,7 @@ function buildStaticTvHtml(h: Hallway): string {
 #news .news-cat{font-weight:700;text-transform:uppercase;padding:2px 0;font-size:120%}
 #news .news-title{font-weight:400;font-size:100%}
 #news + .info-content{margin-top:24px;font-size:calc(16px * var(--info-scale, 1))}
-.info-content{font-size:calc(16px * var(--info-scale, 1))}
+.info-content{font-size:calc(16px * var(--info-scale, 1));background:#1e4656}
 .info-content h1{font-size:calc(28px * var(--info-scale, 1));font-weight:700;line-height:1.2;margin:.4em 0 .3em}
 .info-content h2{font-size:calc(22px * var(--info-scale, 1));font-weight:700;line-height:1.25;margin:.4em 0 .2em}
 .info-content p{margin:.4em 0}
@@ -401,7 +402,7 @@ function buildStaticTvHtml(h: Hallway): string {
 .info-content ul,.info-content ol{margin:.4em 0 .6em 1.3em}
 .info-content ul{list-style:disc}
 .info-content ol{list-style:decimal}
-#logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:transparent}
+#logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#4b5a2a}
 #logos.logos-animate{justify-content:flex-start}
 #logos .logos-track{display:flex;align-items:center;gap:32px;height:100%;width:max-content}
 #logos .logo-item{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:120px}
@@ -495,8 +496,10 @@ function buildStaticTvHtml(h: Hallway): string {
     var usedTop=H?H.getBoundingClientRect().height:0;
     var usedBottom=F?F.getBoundingClientRect().height:0;
     var availH=Math.max(0,ch-usedTop-usedBottom);
-    var s=Math.min(1, availH/G.scrollHeight, cw/G.scrollWidth) * (USER_SCALE>0?USER_SCALE:1);
-    G.style.transform='scale('+s+')';
+    var innerW=Math.max(0, cw-20);
+    var innerH=Math.max(0, availH-20);
+    var s=Math.min(1, innerW/G.scrollWidth) * (USER_SCALE>0?USER_SCALE:1);
+    G.style.transform='translate(10px,10px) scale('+s+')';
     G.style.transformOrigin='top left';
   }
   function getNow(){
@@ -1754,6 +1757,9 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const newsScale = typeof hallway.newsScale === "number" && isFinite(hallway.newsScale) ? hallway.newsScale : 1;
   const infoScale = typeof hallway.infoScale === "number" && isFinite(hallway.infoScale) ? hallway.infoScale : 1;
   const logosScale = typeof hallway.logosScale === "number" && isFinite(hallway.logosScale) ? hallway.logosScale : 1;
+  const baseW = orientation === "portrait" ? 1080 : 1920;
+  const baseH = orientation === "portrait" ? 1920 : 1080;
+  const [contentSize, setContentSize] = useState<{ w: number; h: number }>({ w: baseW, h: baseH });
 
   // Laske esikatselulaatikon koko niin, että pysty = vaaka käänteisenä
   useEffect(() => {
@@ -1797,7 +1803,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     const fitAndCols = () => {
       const C = containerRef.current;
       const H = headerRef.current;
-      const G = gridRef.current;
+      const G = scaleRootRef.current;
       const F = footerRef.current;
 
       const n = floorsAsc.length;
@@ -1810,7 +1816,12 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
       const usedTop = H ? H.getBoundingClientRect().height : 0;
       const usedBottom = F ? F.getBoundingClientRect().height : 0;
       const availH = Math.max(0, ch - usedTop - usedBottom);
-      const s = Math.min(1, cw / G.scrollWidth, availH / G.scrollHeight);
+      const contentW = G.scrollWidth || baseW;
+      const contentH = G.scrollHeight || baseH;
+      const innerW = Math.max(0, cw - 20);
+      const innerH = Math.max(0, availH - 20);
+      const s = Math.min(1, innerW / contentW);
+      setContentSize((prev) => (prev.w !== contentW || prev.h !== contentH ? { w: contentW, h: contentH } : prev));
       setGridScale(Number.isFinite(s) && s > 0 ? s : 1);
     };
 
@@ -1835,8 +1846,9 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const shouldAnimate = !!hallway.logosAnimate && logosShouldAnimate && !!hallway.logosEnabled;
   const newsEnabled = !!hallway.newsEnabled && (hallway.newsRssUrl || "").trim().length > 0;
   const newsLimit = typeof hallway.newsLimit === "number" && hallway.newsLimit > 0 ? Math.floor(hallway.newsLimit) : null;
-  const baseW = orientation === "portrait" ? 1080 : 1920;
-  const baseH = orientation === "portrait" ? 1920 : 1080;
+  const previewScale = gridScale * scaleHint;
+  const offsetX = 10;
+  const offsetY = 10;
   const logosHeight = 130 * logosScale;
   const renderLogos = shouldAnimate ? [...logos, ...logos] : logos;
 
@@ -1923,21 +1935,21 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           className="tv-text-scale"
           style={{
             width: baseW,
-            transform: `scale(${(gridScale * scaleHint).toFixed(3)})`,
+            transform: `translate(${offsetX.toFixed(2)}px, ${offsetY.toFixed(2)}px) scale(${previewScale.toFixed(3)})`,
             transformOrigin: "top left",
             "--preview-text-scale": userScale,
           } as React.CSSProperties}
         >
-          <div className="p-5" style={{ height: baseH, display: "flex", flexDirection: "column" }}>
-          <div ref={headerRef} className="flex items-start justify-between pt-5 px-5">
-            <div style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
+          <div style={{ height: baseH, display: "flex", flexDirection: "column" }}>
+          <div ref={headerRef} className="flex items-start justify-between mb-12">
+            <div className="bg-sky-800" style={{ "--preview-text-scale": userScale * headerScale } as React.CSSProperties}>
               {hallway.building?.trim() ? (
                 <div className="text-2xl font-semibold tracking-wide">{hallway.building}</div>
               ) : null}
               <div className="text-sm opacity-70 -mt-1">{hallway.name}</div>
             </div>
             {hallway.weatherClockEnabled && (
-              <div style={{ "--preview-text-scale": userScale * weatherScale } as React.CSSProperties}>
+              <div className="bg-orange-800" style={{ "--preview-text-scale": userScale * weatherScale } as React.CSSProperties}>
                 <WeatherClock
                   tvStyle
                   city={hallway.weatherCity}
@@ -1951,11 +1963,11 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             )}
           </div>
 
-          <div className="p-5 pt-4 flex-1 flex gap-8 items-stretch">
-            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "basis-1/2" : "basis-full", "min-w-0 p-2 h-full flex") }>
+          <div className="flex-1 flex gap-8 items-stretch px-5">
+            <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex bg-emerald-900 overflow-hidden") }>
               <div
                 className={cn("vcenter w-full", columns.length > 1 ? "flex gap-8" : "")}
-                style={{ paddingLeft: "10%", paddingRight: "10%", "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
+                style={{ "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
               >
                 {columns.map((column, ci) => (
                   <div key={`col-${ci}`} className="min-w-0 flex-1">
@@ -1990,10 +2002,10 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
               </div>
             </div>
           {((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) && (
-            <div className="basis-1/2 min-w-0 p-2">
+            <div className="flex-1 min-w-0 p-2">
               <div style={{ paddingLeft: '10%', paddingRight: '10%' }}>
                 {newsEnabled && (
-                  <div className="news-block" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
+                  <div className="news-block bg-fuchsia-900" style={{ "--preview-text-scale": userScale * newsScale } as React.CSSProperties}>
                     <div className="news-title">Uutiset</div>
                     <div className="news-list">
                     {newsItems.length === 0 ? (
@@ -2013,7 +2025,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                   </div>
                 )}
                 {(hallway.infoEnabled && (hallway.infoHtml || "").trim()) && (
-                  <div className={cn("info-content", newsEnabled && "mt-6")} style={{ "--preview-text-scale": userScale * infoScale } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
+                  <div className={cn("info-content bg-cyan-900", newsEnabled && "mt-6")} style={{ "--preview-text-scale": userScale * infoScale } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: hallway.infoHtml || "" }} />
                 )}
               </div>
             </div>
@@ -2023,7 +2035,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
           <div
             ref={logosRef}
             className={cn(
-              "logo-strip w-full overflow-hidden flex",
+              "logo-strip w-full overflow-hidden flex bg-lime-800",
               shouldAnimate ? "logos-animate" : "justify-center"
             )}
             style={{ height: logosHeight, background: (hallway.logosBgColor || "").trim() || "transparent" }}
