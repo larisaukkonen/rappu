@@ -396,8 +396,8 @@ function buildStaticTvHtml(h: Hallway): string {
 .floor{margin-bottom:24px;padding-bottom:15px}
 .floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:calc(22px * var(--main-scale, 1))}
 .apt-list{display:flex;flex-direction:column;gap:12px}
-.apt-row{display:grid;grid-template-columns:30px 1fr;column-gap:24px}
-.apt-num{font-weight:700;font-variant-numeric:tabular-nums;font-size:calc(14px * var(--main-scale, 1))}
+.apt-row{display:grid;grid-template-columns:calc(30px * var(--main-scale, 1)) 1fr;column-gap:24px}
+.apt-num{font-weight:700;font-variant-numeric:tabular-nums;font-size:calc(14px * var(--main-scale, 1));white-space:nowrap}
 .apt-names{min-width:0}
 .apt-name{font-weight:700;font-size:calc(14px * var(--main-scale, 1));line-height:1.4286}
 .empty{opacity:.4}
@@ -1071,7 +1071,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
                 {startupError && <div className="text-sm text-red-600 mt-2">{startupError}</div>}
               </div>
-              <div className="h-px bg-[#aaaaaa]" />
               <div className="flex items-center justify-between">
                 <div className="text-sm opacity-80">Aloita tyhjästä näkymästä..</div>
                 <Button type="button" variant="secondary" onClick={handleCreateNew}>Luo uusi</Button>
@@ -1292,9 +1291,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   </Button>
                 </div>
 
-                <div className="border-t border-zinc-200 pt-4 mt-4">
-                  {!(hallway.apartmentsManual ?? true) && (
-                    <>
+                {!(hallway.apartmentsManual ?? true) && (
+                  <>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div className="md:col-span-3">
                           <Label htmlFor="apartments-url">Ulkoinen osoite (URI)</Label>
@@ -1348,9 +1346,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                       <div className="text-xs opacity-70 mt-2">
                         Jos <code>hallway</code> puuttuu, oletetaan että syöte koskee yhtä käytävää. <code>floors</code>, <code>name</code>, <code>apartments</code>, <code>number</code> ja <code>tenants</code> ovat pakollisia.
                       </div>
-                    </>
-                  )}
-                </div>
+                  </>
+                )}
 
                 {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
                 {status && <div className="mb-3 text-sm text-green-600">{status}</div>}
@@ -1492,7 +1489,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <div className="text-xs opacity-70 mt-1">Syöte haetaan palvelimen kautta ja päivittyy automaattisesti.</div>
                 </div>
 
-                <div className="max-w-xs">
+                <div className="w-full">
                   <Label htmlFor="news-limit">Näytettävien uutisten määrä</Label>
                   <Input
                     id="news-limit"
@@ -1508,21 +1505,23 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                       }));
                     }}
                     placeholder="Näytä kaikki"
+                    className="w-full"
                     disabled={!hallway.newsEnabled}
                   />
                 </div>
-                <div className="max-w-xs">
+                <div className="w-full">
                   <Label htmlFor="news-title">Uutisotsikko</Label>
                   <Input
                     id="news-title"
                     value={hallway.newsTitle ?? "Uutiset"}
                     onChange={(e) => setHallway((h) => ({ ...h, newsTitle: e.target.value }))}
                     placeholder="Uutiset"
+                    className="w-full"
                     disabled={!hallway.newsEnabled}
                   />
                 </div>
 
-                <div className="max-w-xs">
+                <div className="w-full">
                   <Label htmlFor="news-title-px">Uutisotsikon koko (px)</Label>
                   <Input
                     id="news-title-px"
@@ -1537,6 +1536,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         newsTitlePx: Number.isFinite(num) && num > 0 ? num : undefined,
                       }));
                     }}
+                    className="w-full"
                     disabled={!hallway.newsEnabled}
                   />
                 </div>
@@ -1554,7 +1554,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <Label htmlFor="logos-enabled">Käytössä</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div>
+                  <div className="w-full">
                     <Label>{"Logoja n\u00e4kyviss\u00e4, (1-20)"}</Label>
                     <Input
                       type="text"
@@ -1566,12 +1566,13 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         setHallway((h) => ({ ...h, logosLimit: Number.isFinite(num) ? Math.min(20, Math.max(1, num)) : undefined }));
                       }}
                       placeholder="N&auml;yt&auml; kaikki"
+                      className="w-full"
                       disabled={!hallway.logosEnabled}
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div>
+                  <div className="w-full">
                     <Label>{"Logojen et\u00e4isyys (px), (0-320)"}</Label>
                     <Input
                       type="text"
@@ -1582,6 +1583,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         const num = v ? Number(v) : NaN;
                         setHallway((h) => ({ ...h, logosGap: Number.isFinite(num) ? Math.max(0, num) : undefined }));
                       }}
+                      className="w-full"
                       disabled={!hallway.logosEnabled}
                     />
                   </div>
@@ -1596,7 +1598,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <Label htmlFor="logos-animate">Animoi logot</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div>
+                  <div className="w-full">
                     <Label>Animaation kesto (s), (5-120)</Label>
                     <Input
                       type="text"
@@ -1607,23 +1609,25 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                         const num = v ? Number(v) : NaN;
                         setHallway((h) => ({ ...h, logosSpeed: Number.isFinite(num) ? Math.min(120, Math.max(5, num)) : undefined }));
                       }}
+                      className="w-full"
                       disabled={!hallway.logosEnabled}
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div>
+                  <div className="w-full">
                     <Label>{"Taustav\u00e4ri (hex)"}</Label>
                     <Input
                       value={hallway.logosBgColor || ""}
                       onChange={(e) => setHallway((h) => ({ ...h, logosBgColor: e.target.value.trim() }))}
                       placeholder="#111111"
+                      className="w-full"
                       disabled={!hallway.logosEnabled}
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div>
+                  <div className="w-full">
                     <Label>Lataa logot (max 20)</Label>
                     <input
                       type="file"
@@ -1708,8 +1712,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   />
                   <Label htmlFor="weather-enabled">Käytössä</Label>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="relative">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
+                  <div className="relative w-full">
                     <Label>Kaupunki</Label>
                     <Input
                       value={cityQuery}
@@ -1721,6 +1725,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                       onFocus={() => setIsCityOpen(cityQuery.trim().length >= 2)}
                       onBlur={() => setIsCityOpen(false)}
                       placeholder="esim. Helsinki"
+                      className="w-full"
                       aria-autocomplete="list"
                       aria-expanded={showCitySuggest ? true : false}
                       aria-controls="city-suggest"
@@ -1779,7 +1784,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     </div>
                   )}
                 </div>
-                <div className="h-px bg-[#aaaaaa]" />
               </div>
             )}
 
@@ -2173,8 +2177,12 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
                         <div className="text-xl font-semibold uppercase mb-3">{floorTitle(floor)}</div>
                         <div className="flex flex-col gap-3">
                           {floor.apartments.map((apt) => (
-                            <div key={apt.id} className="grid grid-cols-[30px_1fr] gap-x-6">
-                              <div className="text-sm font-semibold break-words whitespace-normal tabular-nums">{apt.number || "-"}</div>
+                            <div
+                              key={apt.id}
+                              className="grid gap-x-6"
+                              style={{ gridTemplateColumns: "calc(30px * var(--preview-text-scale, 1)) 1fr" }}
+                            >
+                              <div className="text-sm font-semibold tabular-nums whitespace-nowrap overflow-x-auto">{apt.number || "-"}</div>
                               <div className="text-sm font-semibold break-words whitespace-normal">
                                 {apt.tenants.filter((t) => t.surname.trim())[0]?.surname?.toUpperCase() || (
                                   <span className="opacity-40">(tyhjä)</span>
@@ -2287,5 +2295,4 @@ function downloadStaticHtmlFile(filename: string, html: string) {
   link.remove();
   URL.revokeObjectURL(url);
 }
-
 
