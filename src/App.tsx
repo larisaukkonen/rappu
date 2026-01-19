@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun, Copy } from "lucide-react";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun, Copy, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1140,6 +1140,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 (!savedHtml || !hallway.serial?.trim()) && "text-red-700"
               )}
             >
+              <RefreshCw className="h-4 w-4 mr-2" />
               Päivitä
             </Button>
             </span>
@@ -1292,15 +1293,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
 
                 <div className="border-t border-zinc-200 pt-4 mt-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Switch
-                      id="apartments-manual"
-                      checked={hallway.apartmentsManual ?? true}
-                      onCheckedChange={(v) => setHallway((h) => ({ ...h, apartmentsManual: v }))}
-                    />
-                    <Label htmlFor="apartments-manual">Määritä asunnot manuaalisesti</Label>
-                  </div>
-
                   {!(hallway.apartmentsManual ?? true) && (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -1387,7 +1379,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <>
                 {!(hallway.apartmentsManual ?? true) && (
                   <div className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
-                    Asuntojen manuaalinen määritys pois käytöstä. Jos haluat määrittää asunnot manuaalisesti, aktivoi se Asetukset-välilehdeltä.
+                    Asuntojen manuaalinen määritys pois käytöstä. Hallintaportaali määrittää käytettävän tietolähteen.
                   </div>
                 )}
 
@@ -1563,11 +1555,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
                 <div className="flex items-center gap-2">
                   <div>
-                    <Label>{"Logoja n\u00e4kyviss\u00e4"}</Label>
+                    <Label>{"Logoja n\u00e4kyviss\u00e4, (1-20)"}</Label>
                     <Input
-                      type="number"
-                      min={1}
-                      max={20}
+                      type="text"
+                      inputMode="numeric"
                       value={hallway.logosLimit ?? ""}
                       onChange={(e) => {
                         const v = e.target.value.trim();
@@ -1581,11 +1572,10 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
                 <div className="flex items-center gap-2">
                   <div>
-                    <Label>{"Logo-v\u00e4li (px)"}</Label>
+                    <Label>{"Logojen et\u00e4isyys (px), (0-320)"}</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      max={320}
+                      type="text"
+                      inputMode="numeric"
                       value={hallway.logosGap ?? 32}
                       onChange={(e) => {
                         const v = e.target.value.trim();
@@ -1597,12 +1587,20 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <input
+                    id="logos-animate"
+                    type="checkbox"
+                    checked={!!hallway.logosAnimate}
+                    onChange={(e) => setHallway((h) => ({ ...h, logosAnimate: e.target.checked }))}
+                  />
+                  <Label htmlFor="logos-animate">Animoi logot</Label>
+                </div>
+                <div className="flex items-center gap-2">
                   <div>
-                    <Label>Logo-nopeus (s)</Label>
+                    <Label>Animaation kesto (s), (5-120)</Label>
                     <Input
-                      type="number"
-                      min={5}
-                      max={120}
+                      type="text"
+                      inputMode="numeric"
                       value={hallway.logosSpeed ?? 20}
                       onChange={(e) => {
                         const v = e.target.value.trim();
@@ -1637,16 +1635,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="logos-animate"
-                    type="checkbox"
-                    checked={!!hallway.logosAnimate}
-                    onChange={(e) => setHallway((h) => ({ ...h, logosAnimate: e.target.checked }))}
-                  />
-                  <Label htmlFor="logos-animate">Animoi logot</Label>
-                </div>
-
                 {logoUploading && <div className="text-sm opacity-70">{"Logoja ladataan..."}</div>}
                 {logoError && <div className="text-sm text-red-600">{logoError}</div>}
                 <div className="text-xs opacity-70">{"Logoja yhteens\u00e4: "}{(hallway.logos || []).length}/20</div>
