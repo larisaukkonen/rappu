@@ -367,7 +367,9 @@ function buildStaticTvHtml(h: Hallway): string {
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden}
-#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px}
+#scale-root{max-width:100%}
+#header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px;max-width:100%}
+#clock{max-width:100%}
 #brand{background:transparent}
 #brand .title{font-size:calc(28px * var(--header-scale, 1));font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:calc(14px * var(--header-scale, 1))}
@@ -460,7 +462,8 @@ function buildStaticTvHtml(h: Hallway): string {
 <style>${css}</style>
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
-  <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;">
+<div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;">
+    <div id="scale-root" style="width:${baseW}px">
     <div id="header">
       <div id="brand">
         ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
@@ -496,6 +499,7 @@ function buildStaticTvHtml(h: Hallway): string {
       </div>
       ${logosHtml}
     </div>
+    </div>
     <div id="footer"></div>
   </div>
   
@@ -515,17 +519,17 @@ function buildStaticTvHtml(h: Hallway): string {
   var API_ORIGIN = ${JSON.stringify(apiOrigin)};
   function fit(){
     var C=document.getElementById('container');
-    var H=document.getElementById('header');
-    var G=document.getElementById('content');
+    var G=document.getElementById('scale-root');
     var F=document.getElementById('footer');
     if(!C||!G){return;}
     var ch=C.clientHeight; var cw=C.clientWidth;
-    var usedTop=H?H.getBoundingClientRect().height:0;
     var usedBottom=F?F.getBoundingClientRect().height:0;
-    var availH=Math.max(0,ch-usedTop-usedBottom);
+    var availH=Math.max(0,ch-usedBottom);
     var innerW=Math.max(0, cw-20);
     var innerH=Math.max(0, availH-20);
-    var s=Math.min(1, innerW/G.scrollWidth) * (USER_SCALE>0?USER_SCALE:1);
+    var scaleW=innerW/(G.scrollWidth||1);
+    var scaleH=innerH/(G.scrollHeight||1);
+    var s=Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
     G.style.transform='translate(10px,10px) scale('+s+')';
     G.style.transformOrigin='top left';
   }
