@@ -463,7 +463,7 @@ function buildStaticTvHtml(h: Hallway): string {
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
 <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;">
-    <div id="scale-root" style="width:${baseW}px">
+    ${orientation === "portrait" ? `<div id="scale-root" style="width:${baseW}px">` : ""}
     <div id="header">
       <div id="brand">
         ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
@@ -499,7 +499,7 @@ function buildStaticTvHtml(h: Hallway): string {
       </div>
       ${logosHtml}
     </div>
-    </div>
+    ${orientation === "portrait" ? `</div>` : ""}
     <div id="footer"></div>
   </div>
   
@@ -517,14 +517,17 @@ function buildStaticTvHtml(h: Hallway): string {
   var NEWS_URL = ${JSON.stringify((h.newsRssUrl || "").trim())};
   var NEWS_LIMIT = ${newsLimit ?? "null"};
   var API_ORIGIN = ${JSON.stringify(apiOrigin)};
+  var IS_PORTRAIT = ${orientation === "portrait" ? "true" : "false"};
   function fit(){
     var C=document.getElementById('container');
-    var G=document.getElementById('scale-root');
+    var H = IS_PORTRAIT ? null : document.getElementById('header');
+    var G=document.getElementById(IS_PORTRAIT ? 'scale-root' : 'content');
     var F=document.getElementById('footer');
     if(!C||!G){return;}
     var ch=C.clientHeight; var cw=C.clientWidth;
+    var usedTop=H?H.getBoundingClientRect().height:0;
     var usedBottom=F?F.getBoundingClientRect().height:0;
-    var availH=Math.max(0,ch-usedBottom);
+    var availH=Math.max(0,ch-usedTop-usedBottom);
     var innerW=Math.max(0, cw-20);
     var innerH=Math.max(0, availH-20);
     var scaleW=innerW/(G.scrollWidth||1);
@@ -718,6 +721,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [isCityOpen, setIsCityOpen] = useState<boolean>(false);
   const [logoError, setLogoError] = useState<string>("");
   const [logoUploading, setLogoUploading] = useState<boolean>(false);
+  const [logoUploadItems, setLogoUploadItems] = useState<
+    { id: string; name: string; status: "pending" | "uploading" | "done" | "error"; message?: string }[]
+  >([]);
   const [activeLogoId, setActiveLogoId] = useState<string | null>(null);
 
   // Käynnistyspromptti
@@ -886,16 +892,36 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       reader.readAsDataURL(file);
     });
 
-  const uploadLogoFile = async (file: File) => {
+  const uploadLogoFile = async (file: File, signal?: AbortSignal) => {
     const dataUrl = await readFileAsDataUrl(file);
     const res = await fetch("/api/logo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataUrl, filename: file.name }),
+      signal,
     });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     return { url: String(data.url || ""), name: String(data.name || "") };
+  };
+
+
+  const logoUploadAbortRef = useRef<AbortController | null>(null);
+  const logoUploadBatchIdsRef = useRef<string[]>([]);
+  const logoUploadCancelledRef = useRef<boolean>(false);
+
+  const cancelLogoUpload = () => {
+    logoUploadCancelledRef.current = true;
+    logoUploadAbortRef.current?.abort();
+    logoUploadAbortRef.current = null;
+    setLogoUploading(false);
+    setLogoUploadItems([]);
+    setLogoError("");
+    const toRemove = new Set(logoUploadBatchIdsRef.current);
+    if (toRemove.size) {
+      setHallway((h) => ({ ...h, logos: (h.logos || []).filter((l) => !toRemove.has(l.id)) }));
+    }
+    logoUploadBatchIdsRef.current = [];
   };
 
   const handleLogoFiles = async (files: FileList | null) => {
@@ -903,24 +929,60 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     const existingCount = (hallway.logos || []).length;
     if (existingCount + files.length > 20) {
       setLogoError("Enintään 20 logoa sallittu.");
+      setLogoUploadItems([]);
       return;
     }
     setLogoError("");
     setLogoUploading(true);
+    logoUploadCancelledRef.current = false;
+    logoUploadBatchIdsRef.current = [];
+    const controller = new AbortController();
+    logoUploadAbortRef.current = controller;
+    let hadError = false;
     try {
-      const uploadedLogos: { id: string; url: string; name?: string }[] = [];
-      for (const file of Array.from(files)) {
-        const uploaded = await uploadLogoFile(file);
-        const cleanName = file.name.replace(/\.[^.]+$/, "");
-        uploadedLogos.push({ id: uid(), url: uploaded.url, name: uploaded.name || cleanName });
+      const pending = Array.from(files).map((file) => ({ file, id: uid() }));
+      setLogoUploadItems(pending.map((item) => ({ id: item.id, name: item.file.name, status: "pending" })));
+      for (const item of pending) {
+        if (logoUploadCancelledRef.current) break;
+        setLogoUploadItems((prev) =>
+          prev.map((entry) => (entry.id === item.id ? { ...entry, status: "uploading" } : entry))
+        );
+        try {
+          const uploaded = await uploadLogoFile(item.file, controller.signal);
+          const cleanName = item.file.name.replace(/\.[^.]+$/, "");
+          const newId = uid();
+          logoUploadBatchIdsRef.current.push(newId);
+          setHallway((h) => ({ ...h, logos: [...(h.logos || []), { id: newId, url: uploaded.url, name: uploaded.name || cleanName }] }));
+          setLogoUploadItems((prev) =>
+            prev.map((entry) => (entry.id === item.id ? { ...entry, status: "done" } : entry))
+          );
+        } catch (e: any) {
+          if (logoUploadCancelledRef.current || e?.name === "AbortError") {
+            break;
+          }
+          const message = e?.message || "Lataus epäonnistui";
+          hadError = true;
+          setLogoUploadItems((prev) =>
+            prev.map((entry) => (entry.id === item.id ? { ...entry, status: "error", message } : entry))
+          );
+        }
       }
-      setHallway((h) => ({ ...h, logos: [...(h.logos || []), ...uploadedLogos] }));
     } catch (e: any) {
-      setLogoError(e?.message || "Logo-upload epäonnistui");
+      if (!logoUploadCancelledRef.current) {
+        hadError = true;
+        setLogoError(e?.message || "Logo-upload epäonnistui");
+      }
     } finally {
-      setLogoUploading(false);
+      logoUploadAbortRef.current = null;
+      if (!logoUploadCancelledRef.current) {
+        setLogoUploading(false);
+        if (!hadError) {
+          setLogoUploadItems([]);
+        }
+      }
     }
   };
+
 
   const moveLogo = (fromId: string, toId: string) => {
     if (fromId === toId) return;
@@ -1643,7 +1705,43 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     />
                   </div>
                 </div>
-                {logoUploading && <div className="text-sm opacity-70">{"Logoja ladataan..."}</div>}
+                {logoUploadItems.length > 0 && (
+                  <div className="text-sm space-y-2">
+                    {logoUploadItems.map((item) => {
+                      const statusLabel =
+                        item.status === "pending"
+                          ? "Odottaa"
+                          : item.status === "uploading"
+                            ? "Ladataan..."
+                            : item.status === "done"
+                              ? "Valmis"
+                              : "Virhe";
+                      const statusClass =
+                        item.status === "error"
+                          ? "text-red-600"
+                          : item.status === "done"
+                            ? "text-green-700"
+                            : "text-zinc-600";
+                      return (
+                        <div key={item.id} className="space-y-0.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="truncate">{item.name}</span>
+                            <span className={statusClass}>{statusLabel}</span>
+                          </div>
+                          {item.status === "error" && item.message ? (
+                            <div className="text-xs text-red-600">{item.message}</div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {logoUploading && (
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm opacity-70">{"Logoja ladataan..."}</div>
+                    <Button type="button" variant="secondary" onClick={cancelLogoUpload} className="rounded-2xl">Peruuta lataus</Button>
+                  </div>
+                )}
                 {logoError && <div className="text-sm text-red-600">{logoError}</div>}
                 <div className="text-xs opacity-70">{"Logoja yhteens\u00e4: "}{(hallway.logos || []).length}/20</div>
 
