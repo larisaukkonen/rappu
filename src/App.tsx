@@ -348,6 +348,7 @@ function buildStaticTvHtml(h: Hallway): string {
   const infoScale = typeof h.infoScale === "number" && isFinite(h.infoScale) ? h.infoScale : 1;
   const logosScale = typeof h.logosScale === "number" && isFinite(h.logosScale) ? h.logosScale : 1;
   const logosHeight = 130 * logosScale;
+  const logosSpeed = typeof h.logosSpeed === "number" && isFinite(h.logosSpeed) ? h.logosSpeed : 20;
 
   const logosBg = (h.logosBgColor || "").trim();
   const logosBgStyle = logosBg ? ` style="background:${escapeHtml(logosBg)}"` : "";
@@ -426,12 +427,12 @@ function buildStaticTvHtml(h: Hallway): string {
 .info-content ol{list-style:decimal}
 #logos{height:${logosHeight}px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
 #logos.logos-animate{justify-content:flex-start}
-#logos .logos-track{display:flex;align-items:center;gap:var(--logos-gap, 32px);height:100%;width:max-content}
+#logos .logos-track{display:flex;align-items:center;gap:var(--logos-gap, 32px);height:100%;width:max-content;will-change:transform}
 #logos .logo-item{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:120px}
 #logos .logo-img{height:60%;width:auto;max-width:100%;object-fit:contain}
 #logos .logo-name{display:none}
 #logos.logos-animate .logos-track{animation:logos-marquee var(--logos-speed, 20s) linear infinite}
-@keyframes logos-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes logos-marquee{from{transform:translateX(var(--logos-start, 0px))}to{transform:translateX(var(--logos-end, -100%))}}
 `;
 
   const jsonEmbedded = JSON.stringify(h).replace(/</g, "\u003c");
@@ -462,7 +463,7 @@ function buildStaticTvHtml(h: Hallway): string {
 <style>${css}</style>
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
-<div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;">
+<div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;--logos-speed:${logosSpeed}s;">
     ${orientation === "portrait" ? `<div id="scale-root" style="width:${baseW}px">` : ""}
     <div id="header">
       <div id="brand">
@@ -642,11 +643,34 @@ function buildStaticTvHtml(h: Hallway): string {
       if(animate) logos.classList.add('logos-animate');
       else logos.classList.remove('logos-animate');
       if(!animate) return;
-      if(track.scrollWidth <= logos.clientWidth) return;
-      track.insertAdjacentHTML('beforeend', track.innerHTML);
+      if(!track.getAttribute('data-original-html')){
+        track.setAttribute('data-original-html', track.innerHTML);
+        track.setAttribute('data-original-count', String(track.children.length));
+      }
+      var originalHtml = track.getAttribute('data-original-html') || '';
+      var baseCount = parseInt(track.getAttribute('data-original-count') || '0', 10);
+      if(!originalHtml || !baseCount) return;
+      track.innerHTML = originalHtml;
+      var lastBase = track.children[baseCount - 1];
+      if(!lastBase) return;
+      var baseWidth = lastBase.offsetLeft + lastBase.offsetWidth;
+      if(!baseWidth) return;
+      var repeat = Math.max(1, Math.ceil(logos.clientWidth / baseWidth));
+      var tiledHtml = '';
+      for(var i=0;i<repeat;i++){ tiledHtml += originalHtml; }
+      track.innerHTML = tiledHtml + tiledHtml;
+      var setCount = baseCount * repeat;
+      var first = track.children[0];
+      var second = track.children[setCount];
+      var span = (first && second) ? (second.offsetLeft - first.offsetLeft) : (baseWidth * repeat);
+      var start = 0;
+      var end = -span;
+      track.style.setProperty('--logos-start', start + 'px');
+      track.style.setProperty('--logos-end', end + 'px');
     }catch(e){}
   }
   window.addEventListener('resize', fit);
+  window.addEventListener('resize', setupLogos);
   document.addEventListener('DOMContentLoaded', fit);
   setTimeout(fit, 50);
   function extractBuildId(html){
@@ -663,6 +687,7 @@ function buildStaticTvHtml(h: Hallway): string {
     }catch(e){}
   }
   document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); loadNews(); setupLogos(); setInterval(checkForUpdate, CHECK_INTERVAL_MIN * 60000); });
+  window.addEventListener('load', setupLogos);
 })();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
 </body>
@@ -2048,7 +2073,11 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const [scaleHint, setScaleHint] = useState(1);
   const logosRef = useRef<HTMLDivElement>(null);
   const logosTrackRef = useRef<HTMLDivElement>(null);
-  const [logosShouldAnimate, setLogosShouldAnimate] = useState(false);
+  const [logosRepeat, setLogosRepeat] = useState(1);
+  const [logosReady, setLogosReady] = useState(false);
+  const logosMeasureRef = useRef<{ width: number; span: number; repeat: number }>({ width: 0, span: 0, repeat: 1 });
+  const logosAnimRef = useRef<Animation | null>(null);
+  const logosAnimMetaRef = useRef<{ span: number; speed: number } | null>(null);
   const [newsItems, setNewsItems] = useState<{ title: string; category: string }[]>([]);
 
   const userScale = typeof hallway.scale === "number" && isFinite(hallway.scale) ? hallway.scale : 1;
@@ -2144,7 +2173,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   );
   const logosLimit = typeof hallway.logosLimit === "number" && hallway.logosLimit > 0 ? Math.floor(hallway.logosLimit) : null;
   const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
-  const shouldAnimate = !!hallway.logosAnimate && logosShouldAnimate && !!hallway.logosEnabled;
+  const shouldAnimate = !!hallway.logosAnimate && !!hallway.logosEnabled;
   const newsEnabled = !!hallway.newsEnabled && (hallway.newsRssUrl || "").trim().length > 0;
   const infoPinBottom = !!hallway.infoPinBottom;
   const infoAlignRight = !!hallway.infoAlignRight;
@@ -2153,30 +2182,95 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
   const offsetX = 10;
   const offsetY = 10;
   const logosHeight = 130 * logosScale;
-  const renderLogos = shouldAnimate ? [...logos, ...logos] : logos;
+  const tiledLogos = useMemo(() => {
+    if (!shouldAnimate) return logos;
+    const repeat = Math.max(1, logosRepeat);
+    const out: typeof logos = [];
+    for (let i = 0; i < repeat; i++) out.push(...logos);
+    return out;
+  }, [logos, logosRepeat, shouldAnimate]);
+  const renderLogos = shouldAnimate ? [...tiledLogos, ...tiledLogos] : tiledLogos;
 
   useEffect(() => {
-    if (!hallway.logosEnabled) {
-      setLogosShouldAnimate(false);
-      return;
-    }
-    if (!hallway.logosAnimate) {
-      setLogosShouldAnimate(false);
+    if (!shouldAnimate) {
+      setLogosRepeat(1);
+      setLogosReady(false);
+      logosMeasureRef.current = { width: 0, span: 0, repeat: 1 };
+      if (logosAnimRef.current) {
+        logosAnimRef.current.cancel();
+        logosAnimRef.current = null;
+      }
+      logosAnimMetaRef.current = null;
       return;
     }
     const track = logosTrackRef.current;
     const wrap = logosRef.current;
-    if (!track || !wrap) return;
+    if (!track || !wrap || logos.length === 0) return;
+    let raf = 0;
     const measure = () => {
-      const width = logosShouldAnimate ? track.scrollWidth / 2 : track.scrollWidth;
-      setLogosShouldAnimate(width > wrap.clientWidth);
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const baseCount = logos.length;
+        const children = track.children;
+        const lastBase = children[baseCount - 1] as HTMLElement | undefined;
+        if (!lastBase) return;
+        const baseWidth = lastBase.offsetLeft + lastBase.offsetWidth;
+        if (!Number.isFinite(baseWidth) || baseWidth <= 0) return;
+        const wrapWidth = wrap.clientWidth;
+        const nextRepeat = Math.max(1, Math.ceil(wrapWidth / baseWidth));
+        const setCount = baseCount * nextRepeat;
+        const first = children[0] as HTMLElement | undefined;
+        const second = children[setCount] as HTMLElement | undefined;
+        const span = first && second ? second.offsetLeft - first.offsetLeft : baseWidth * nextRepeat;
+        const prev = logosMeasureRef.current;
+        if (prev.width !== wrapWidth || prev.span !== span || prev.repeat !== nextRepeat) {
+          logosMeasureRef.current = { width: wrapWidth, span, repeat: nextRepeat };
+          if (nextRepeat !== logosRepeat) {
+            setLogosRepeat(nextRepeat);
+            return;
+          }
+        }
+        if (logosReady) {
+          const speed = typeof hallway.logosSpeed === "number" && isFinite(hallway.logosSpeed) ? hallway.logosSpeed : 20;
+          const meta = logosAnimMetaRef.current;
+          if (!meta || meta.span !== span || meta.speed !== speed) {
+            if (logosAnimRef.current) logosAnimRef.current.cancel();
+            logosAnimRef.current = track.animate(
+              [
+                { transform: "translate3d(0, 0, 0)" },
+                { transform: `translate3d(${-span}px, 0, 0)` },
+              ],
+              { duration: speed * 1000, iterations: Infinity, easing: "linear" }
+            );
+            logosAnimMetaRef.current = { span, speed };
+          }
+        }
+        if (!logosReady) {
+          const baseImages = Array.from(children)
+            .slice(0, baseCount)
+            .map((el) => (el as HTMLElement).querySelector("img"))
+            .filter((img): img is HTMLImageElement => !!img);
+          const allLoaded = baseImages.length > 0 && baseImages.every((img) => img.complete);
+          if (allLoaded) {
+            setLogosReady(true);
+          }
+        }
+      });
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(track);
     ro.observe(wrap);
-    return () => ro.disconnect();
-  }, [hallway.logosAnimate, logos.length, boxSize.w, orientation, logosShouldAnimate]);
+    const images = Array.from(track.querySelectorAll("img"));
+    const onImg = () => measure();
+    images.forEach((img) => img.addEventListener("load", onImg, { once: true }));
+    return () => {
+      ro.disconnect();
+      images.forEach((img) => img.removeEventListener("load", onImg));
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [shouldAnimate, logos.length, logosRepeat, logosReady, hallway.logosSpeed]);
+
+
 
   useEffect(() => {
     if (!newsEnabled) {
@@ -2367,7 +2461,10 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             <div
               ref={logosTrackRef}
               className="logos-track h-full"
-              style={{ gap: typeof hallway.logosGap === "number" ? hallway.logosGap : 32, animationDuration: `${(typeof hallway.logosSpeed === "number" && isFinite(hallway.logosSpeed) ? hallway.logosSpeed : 20)}s` }}
+              style={{
+                gap: typeof hallway.logosGap === "number" ? hallway.logosGap : 32,
+                animation: shouldAnimate ? "none" : undefined,
+              } as React.CSSProperties}
             >
               {renderLogos.map((logo, idx) => (
                 <div key={`${logo.id}-${idx}`} className="logo-item h-full">
