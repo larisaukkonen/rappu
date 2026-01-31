@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun, Copy, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Save, MonitorPlay, Users, Building2, Hash, ExternalLink, Newspaper, Settings, Type, Building, Megaphone, Info, CloudSun, Copy } from "lucide-react";
 import { cn } from "@/lib/utils"; // jos projektissa ei ole tätä, voit korvata paikallisella apurilla (kommentti alla)
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +119,7 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   weatherClockEnabled: partial?.weatherClockEnabled ?? false,
   newsEnabled: partial?.newsEnabled ?? false,
   newsRssUrl: partial?.newsRssUrl || "",
-  newsLimit: partial?.newsLimit,
+  newsLimit: typeof partial?.newsLimit === "number" ? partial?.newsLimit : 5,
   newsTitle: partial?.newsTitle || "Uutiset",
   newsTitlePx: typeof partial?.newsTitlePx === "number" ? partial?.newsTitlePx : 36,
   logos: partial?.logos || [],
@@ -464,7 +464,6 @@ function buildStaticTvHtml(h: Hallway): string {
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
 <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;--logos-speed:${logosSpeed}s;">
-    ${orientation === "portrait" ? `<div id="scale-root" style="width:${baseW}px">` : ""}
     <div id="header">
       <div id="brand">
         ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
@@ -483,6 +482,7 @@ function buildStaticTvHtml(h: Hallway): string {
         </div>
       </div>` : ""}
     </div>
+    ${orientation === "portrait" ? `<div id="scale-root" style="width:${baseW}px">` : ""}
     <div id="content" style="width:${baseW}px">
       <div id="main">
         <div class="cols ${infoHtml || newsEnabled ? "cols-2" : "cols-1"}">
@@ -521,7 +521,7 @@ function buildStaticTvHtml(h: Hallway): string {
   var IS_PORTRAIT = ${orientation === "portrait" ? "true" : "false"};
   function fit(){
     var C=document.getElementById('container');
-    var H = IS_PORTRAIT ? null : document.getElementById('header');
+    var H = document.getElementById('header');
     var G=document.getElementById(IS_PORTRAIT ? 'scale-root' : 'content');
     var F=document.getElementById('footer');
     if(!C||!G){return;}
@@ -536,6 +536,12 @@ function buildStaticTvHtml(h: Hallway): string {
     var s=Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
     G.style.transform='translate(10px,10px) scale('+s+')';
     G.style.transformOrigin='top left';
+    if(H){
+      var scaledW = (G.scrollWidth||1) * s;
+      H.style.width = scaledW + 'px';
+      H.style.marginLeft = '10px';
+      H.style.marginRight = '0px';
+    }
   }
   function getNow(){
     if(CLOCK_MODE==='manual' && CLOCK_DATE && CLOCK_TIME){
@@ -586,12 +592,15 @@ function buildStaticTvHtml(h: Hallway): string {
     return u.toString();
   }
   function loadWeather(){
-    if(!CITY && (LAT===null || LON===null)) { setTemps(null,null); setIcon(null); return; }
+    var fallbackCity = 'Helsinki';
+    var fallbackCoords = { lat: 60.1699, lon: 24.9384 };
+    var cityName = (CITY || '').trim() || fallbackCity;
     var geoPromise;
     if(LAT!==null && LON!==null) geoPromise = Promise.resolve({lat:LAT, lon:LON});
-    else geoPromise = fetch(resolveUrl('https://geocoding-api.open-meteo.com/v1/search',{name:CITY,count:'1',language:'fi',format:'json'}),{cache:'no-store'})
+    else geoPromise = fetch(resolveUrl('https://geocoding-api.open-meteo.com/v1/search',{name:cityName,count:'1',language:'fi',format:'json'}),{cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error('geo'); return r.json(); })
-      .then(function(d){ var g=d&&d.results&&d.results[0]; if(!g) throw new Error('geo'); return {lat:g.latitude, lon:g.longitude}; });
+      .then(function(d){ var g=d&&d.results&&d.results[0]; if(!g) throw new Error('geo'); return {lat:g.latitude, lon:g.longitude}; })
+      .catch(function(){ return fallbackCoords; });
     geoPromise.then(function(pos){
       return fetch(resolveUrl('https://api.open-meteo.com/v1/forecast',{
         latitude: String(pos.lat),
@@ -601,8 +610,13 @@ function buildStaticTvHtml(h: Hallway): string {
       }),{cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error('weather'); return r.json(); })
       .then(function(d){
-        var i=0; var tMax = d&&d.daily&&d.daily.temperature_2m_max? d.daily.temperature_2m_max[i]: null; var tMin = d&&d.daily&&d.daily.temperature_2m_min? d.daily.temperature_2m_min[i]: null; var code = d&&d.daily&&d.daily.weathercode? d.daily.weathercode[i]: null;
-        setTemps(tMax, tMin); setIcon(typeof code === 'number' ? code : null);
+        var i=0;
+        var tMax = d&&d.daily&&d.daily.temperature_2m_max? d.daily.temperature_2m_max[i]: null;
+        var tMin = d&&d.daily&&d.daily.temperature_2m_min? d.daily.temperature_2m_min[i]: null;
+        var rawCode = (d&&d.daily&&d.daily.weathercode? d.daily.weathercode[i]: null);
+        if(rawCode == null && d&&d.daily&&d.daily.weather_code) rawCode = d.daily.weather_code[i];
+        var code = (typeof rawCode === 'string') ? Number(rawCode) : rawCode;
+        setTemps(tMax, tMin); setIcon(typeof code === 'number' && isFinite(code) ? code : null);
       });
     }).catch(function(){ setTemps(null,null); setIcon(null); });
   }
@@ -686,7 +700,7 @@ function buildStaticTvHtml(h: Hallway): string {
       }).catch(function(){});
     }catch(e){}
   }
-  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 1000); loadWeather(); loadNews(); setupLogos(); setInterval(checkForUpdate, CHECK_INTERVAL_MIN * 60000); });
+  document.addEventListener('DOMContentLoaded', function(){ updateClock(); setInterval(updateClock, 60000); loadWeather(); setInterval(loadWeather, 60000); loadNews(); setInterval(loadNews, 5 * 60000); setupLogos(); checkForUpdate(); setInterval(checkForUpdate, CHECK_INTERVAL_MIN * 60000); });
   window.addEventListener('load', setupLogos);
 })();</script>
   <script id="__HALLWAY_DATA__" type="application/json">${jsonEmbedded}</script>
@@ -736,7 +750,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [error, setError] = useState<string>("");
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [showSavedDialog, setShowSavedDialog] = useState<boolean>(false);
-  const [showNoSavedDialog, setShowNoSavedDialog] = useState<boolean>(false);
   const [showSerialDialog, setShowSerialDialog] = useState<boolean>(false);
   const [serialInput, setSerialInput] = useState<string>("");
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
@@ -750,6 +763,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     { id: string; name: string; status: "pending" | "uploading" | "done" | "error"; message?: string }[]
   >([]);
   const [activeLogoId, setActiveLogoId] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [logosSpeedInput, setLogosSpeedInput] = useState<string>("20");
+  const [logosSpeedTouched, setLogosSpeedTouched] = useState<boolean>(false);
 
   // Käynnistyspromptti
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
@@ -758,6 +774,18 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
   // Lukitusluokka gridiin (ettei wrapata kolumnit rikki)
   const lockClass = showStartupPrompt ? "pointer-events-none select-none blur-[1px]" : "";
+
+  const applySavedViewMeta = (serial: string, html: string) => {
+    const normalized = serial.trim().toUpperCase();
+    if (!normalized) return;
+    const filename = staticFilenameFor({ ...hallway, serial: normalized });
+    const relPath = `/${RUUTU_DIR}/${filename}`;
+    const absUrl = new URL(relPath, window.location.origin);
+    absUrl.searchParams.set("raw", "1");
+    setSavedHtml(html);
+    setSavedFilename(filename);
+    setSavedUrl(absUrl.toString());
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -784,6 +812,17 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       mounted = false;
     };
   }, [hallwayId]);
+
+  useEffect(() => {
+    setLogosSpeedTouched(false);
+  }, [hallway.id]);
+
+  useEffect(() => {
+    if (!logosSpeedTouched) {
+      const next = typeof hallway.logosSpeed === "number" && isFinite(hallway.logosSpeed) ? String(hallway.logosSpeed) : "20";
+      setLogosSpeedInput(next);
+    }
+  }, [hallway.id, hallway.logosSpeed, logosSpeedTouched]);
 
   // CRUD - kerrokset, asunnot, asukkaat
   const addFloor = () =>
@@ -854,6 +893,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     }));
 
   const sortedFloors = useMemo(() => [...hallway.floors].sort((a, b) => b.level - a.level), [hallway.floors]);
+  const logosSpeedValue = logosSpeedInput.trim();
+  const logosSpeedNum = logosSpeedValue ? Number(logosSpeedValue) : NaN;
+  const logosSpeedValid = Number.isFinite(logosSpeedNum) && logosSpeedNum >= 5 && logosSpeedNum <= 120;
 
   // Jos URLissa on ?serial=ABC, yritä hakea talletettu näkymä automaattisesti adminissa
   useEffect(() => {
@@ -870,6 +912,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           const data = parseHallwayFromStaticHtml(text);
           if (!data) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.'); return; }
           setHallway({ ...emptyHallway(), ...data, serial });
+          applySavedViewMeta(serial, text);
           setShowStartupPrompt(false);
         } catch {
           setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.');
@@ -898,6 +941,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         return;
       }
       setHallway({ ...emptyHallway(), ...data, serial });
+      applySavedViewMeta(serial, text);
       setShowStartupPrompt(false);
     } catch (e) {
       setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näkymää.");
@@ -905,6 +949,9 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   };
   const handleCreateNew = () => {
     setHallway(emptyHallway({ orientation: hallway.orientation }));
+    setSavedHtml("");
+    setSavedFilename("");
+    setSavedUrl(null);
     setShowStartupPrompt(false);
     setError("");
   };
@@ -934,6 +981,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const logoUploadAbortRef = useRef<AbortController | null>(null);
   const logoUploadBatchIdsRef = useRef<string[]>([]);
   const logoUploadCancelledRef = useRef<boolean>(false);
+  const clearLogoInput = () => {
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+  };
 
   const cancelLogoUpload = () => {
     logoUploadCancelledRef.current = true;
@@ -942,6 +994,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     setLogoUploading(false);
     setLogoUploadItems([]);
     setLogoError("");
+    clearLogoInput();
     const toRemove = new Set(logoUploadBatchIdsRef.current);
     if (toRemove.size) {
       setHallway((h) => ({ ...h, logos: (h.logos || []).filter((l) => !toRemove.has(l.id)) }));
@@ -955,6 +1008,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     if (existingCount + files.length > 20) {
       setLogoError("Enintään 20 logoa sallittu.");
       setLogoUploadItems([]);
+      clearLogoInput();
       return;
     }
     setLogoError("");
@@ -1005,6 +1059,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           setLogoUploadItems([]);
         }
       }
+      clearLogoInput();
     }
   };
 
@@ -1068,37 +1123,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       return;
     }
     await saveWithSerial();
-  };
-
-  const handleReload = async () => {
-    const serial = hallway.serial?.trim();
-    if (!serial || !savedHtml) {
-      setShowNoSavedDialog(true);
-      return;
-    }
-    try {
-      setError("");
-      setStatus("Ladataan...");
-      const res = await fetch(`/ruutu/${encodeURIComponent(serial)}.html?raw=1`, { cache: "no-store" });
-      if (!res.ok) {
-        setStatus("");
-        setError("Tallennetun n?kym?n lataus ep?onnistui.");
-        return;
-      }
-      const text = await res.text();
-      const data = parseHallwayFromStaticHtml(text);
-      if (!data) {
-        setStatus("");
-        setError("Tallennettua n?kym?? ei l?ydy.");
-        return;
-      }
-      setHallway({ ...emptyHallway(), ...data, serial });
-      setStatus("Ladattu");
-      setTimeout(() => setStatus(""), 3000);
-    } catch (e: any) {
-      setStatus("");
-      setError(e?.message || "Lataus ep?onnistui");
-    }
   };
 
   // Dev-testit ("test cases")
@@ -1221,19 +1245,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
-            <span className="inline-flex" title={!savedHtml || !hallway.serial?.trim() ? "Ei tallennettua näkymää." : "Päivitä näkymä (lataa sivun uudelleen näytöllä)."}>
-            <Button
-              onClick={handleReload}
-              variant="secondary"
-              className={cn(
-                "rounded-2xl px-4",
-                (!savedHtml || !hallway.serial?.trim()) && "text-red-700"
-              )}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Päivitä
-            </Button>
-            </span>
             <span className="inline-flex" title={!hallway.serial?.trim() ? "Näkymää ei voi tallentaa ilman sarjanumeroa (määritetään Asetukset-välilehdellä)." : "Tallenna näkymä annetulla sarjanumerolla."}>
             <Button
               onClick={handleSave}
@@ -1694,13 +1705,20 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     <Input
                       type="text"
                       inputMode="numeric"
-                      value={hallway.logosSpeed ?? 20}
+                      value={logosSpeedInput}
                       onChange={(e) => {
-                        const v = e.target.value.trim();
-                        const num = v ? Number(v) : NaN;
-                        setHallway((h) => ({ ...h, logosSpeed: Number.isFinite(num) ? Math.min(120, Math.max(5, num)) : undefined }));
+                        const v = e.target.value;
+                        setLogosSpeedTouched(true);
+                        setLogosSpeedInput(v);
+                        const trimmed = v.trim();
+                        const num = trimmed ? Number(trimmed) : NaN;
+                        const valid = Number.isFinite(num) && num >= 5 && num <= 120;
+                        setHallway((h) => ({ ...h, logosSpeed: valid ? num : 5 }));
                       }}
-                      className="w-full"
+                      className={cn(
+                        "w-full",
+                        hallway.logosEnabled && !logosSpeedValid && "border-red-500 focus-visible:ring-red-500 focus-visible:ring-1"
+                      )}
                       disabled={!hallway.logosEnabled}
                     />
                   </div>
@@ -1721,6 +1739,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <div className="w-full">
                     <Label>Lataa logot (max 20)</Label>
                     <input
+                      ref={logoInputRef}
                       type="file"
                       accept="image/*"
                       multiple
@@ -1989,17 +2008,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           </div>
           <DialogFooter>
             <Button type="button" onClick={() => setShowSavedDialog(false)}>Sulje</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showNoSavedDialog} onOpenChange={setShowNoSavedDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{"P\u00e4ivitys estetty"}</DialogTitle>
-          </DialogHeader>
-          <p>{"Ei tallennettua n\u00e4kym\u00e4\u00e4. Et voi p\u00e4ivitt\u00e4\u00e4 n\u00e4kym\u00e4\u00e4 jota ei ole tallennettu. N\u00e4kym\u00e4n voi tallentaa kun olet antanut laitteen sarjanumeron Asetukset-v\u00e4lilehdell\u00e4."}</p>
-          <DialogFooter>
-            <Button type="button" onClick={() => setShowNoSavedDialog(false)}>Sulje</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

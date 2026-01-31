@@ -88,23 +88,20 @@ export default function WeatherClock({ className, city, lat, lon, clockMode = "a
     let cancelled = false;
     async function resolveCoords(): Promise<{ lat: number; lon: number }> {
       if (typeof lat === "number" && typeof lon === "number") return { lat, lon };
-      if (city && city.trim()) {
-        try {
-          const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
-        u.searchParams.set("name", city.trim()); u.searchParams.set("count", "1"); u.searchParams.set("language", "fi"); u.searchParams.set("format", "json");
-          const r = await fetch(u.toString(), { cache: "no-store" });
-          if (r.ok) { const j = await r.json(); const g = j?.results?.[0]; if (g) return { lat: g.latitude, lon: g.longitude }; }
-        } catch {}
-      }
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            const t = setTimeout(() => reject(new Error("geolocation-timeout")), 4000);
-            navigator.geolocation.getCurrentPosition(p => { clearTimeout(t); resolve(p); }, () => { clearTimeout(t); reject(new Error("geolocation-error")); }, { enableHighAccuracy: false, maximumAge: 60000, timeout: 3500 });
-          });
-          return { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        } catch {}
-      }
+      const cityName = (city || "").trim() || "Helsinki";
+      try {
+        const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
+        u.searchParams.set("name", cityName);
+        u.searchParams.set("count", "1");
+        u.searchParams.set("language", "fi");
+        u.searchParams.set("format", "json");
+        const r = await fetch(u.toString(), { cache: "no-store" });
+        if (r.ok) {
+          const j = await r.json();
+          const g = j?.results?.[0];
+          if (g) return { lat: g.latitude, lon: g.longitude };
+        }
+      } catch {}
       return { lat: 60.1699, lon: 24.9384 };
     }
     async function load() {
