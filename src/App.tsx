@@ -650,7 +650,7 @@ function buildStaticTvHtml(h: Hallway): string {
   }
   var logosAnim = null;
   var logosAnimMeta = null;
-  var logosMeasure = { width: 0, span: 0, repeat: 1 };
+  var logosState = { repeat: 1, span: 0 };
   var logosReady = false;
   var logosRaf = 0;
   var logosRO = null;
@@ -659,7 +659,7 @@ function buildStaticTvHtml(h: Hallway): string {
     if(logosAnim){ logosAnim.cancel(); logosAnim = null; }
     logosAnimMeta = null;
     logosReady = false;
-    logosMeasure = { width: 0, span: 0, repeat: 1 };
+    logosState = { repeat: 1, span: 0 };
     if(logosRO){ logosRO.disconnect(); logosRO = null; }
     logosImgListeners.forEach(function(x){ x.img.removeEventListener('load', x.fn); });
     logosImgListeners = [];
@@ -685,10 +685,9 @@ function buildStaticTvHtml(h: Hallway): string {
         track.setAttribute('data-original-html', baseHtml);
         track.setAttribute('data-original-count', String(baseCountSeed));
       }
-      var originalHtml = track.getAttribute('data-original-html') || '';
+      var baseHtml = track.getAttribute('data-original-html') || '';
       var baseCount = parseInt(track.getAttribute('data-original-count') || '0', 10);
-      if(!originalHtml || !baseCount) return;
-      track.innerHTML = originalHtml;
+      if(!baseHtml || !baseCount) return;
       function bindImages(){
         logosImgListeners.forEach(function(x){ x.img.removeEventListener('load', x.fn); });
         logosImgListeners = [];
@@ -711,30 +710,36 @@ function buildStaticTvHtml(h: Hallway): string {
           logosAnimMeta = { span: span, speed: speed };
         }
       }
+      function buildTrack(repeat){
+        var tiledHtml = '';
+        for(var i=0;i<repeat;i++){ tiledHtml += baseHtml; }
+        track.innerHTML = tiledHtml + tiledHtml;
+        logosReady = false;
+        bindImages();
+      }
       function measure(){
-        var children = track.children;
-        var lastBase = children[baseCount - 1];
-        if(!lastBase) return;
-        var baseWidth = lastBase.offsetLeft + lastBase.offsetWidth;
+        var measureRoot = document.createElement('div');
+        measureRoot.style.cssText = 'position:absolute;left:-99999px;top:-99999px;visibility:hidden;height:0;overflow:hidden;white-space:nowrap;';
+        measureRoot.innerHTML = baseHtml;
+        document.body.appendChild(measureRoot);
+        var lastBase = measureRoot.children[baseCount - 1];
+        var baseWidth = lastBase ? (lastBase.offsetLeft + lastBase.offsetWidth) : 0;
+        document.body.removeChild(measureRoot);
         if(!Number.isFinite(baseWidth) || baseWidth <= 0) return;
         var wrapWidth = logos.clientWidth;
         var nextRepeat = Math.max(1, Math.ceil(wrapWidth / baseWidth));
-        if(logosMeasure.repeat !== nextRepeat){
-          logosMeasure.repeat = nextRepeat;
-          var tiledHtml = '';
-          for(var i=0;i<nextRepeat;i++){ tiledHtml += originalHtml; }
-          track.innerHTML = tiledHtml + tiledHtml;
-          logosReady = false;
-          bindImages();
+        if(logosState.repeat !== nextRepeat){
+          logosState.repeat = nextRepeat;
+          buildTrack(nextRepeat);
           scheduleMeasure();
           return;
         }
+        var children = track.children;
         var setCount = baseCount * nextRepeat;
         var first = children[0];
         var second = children[setCount];
         var span = (first && second) ? (second.offsetLeft - first.offsetLeft) : (baseWidth * nextRepeat);
-        logosMeasure.width = wrapWidth;
-        logosMeasure.span = span;
+        logosState.span = span;
         if(!logosReady){
           var baseImages = Array.from(children).slice(0, baseCount).map(function(el){ return el.querySelector('img'); }).filter(Boolean);
           var allLoaded = baseImages.length > 0 && baseImages.every(function(img){ return img.complete; });
@@ -746,11 +751,13 @@ function buildStaticTvHtml(h: Hallway): string {
         if(logosRaf) cancelAnimationFrame(logosRaf);
         logosRaf = requestAnimationFrame(function(){ logosRaf = 0; measure(); });
       }
-      bindImages();
+      buildTrack(logosState.repeat);
       scheduleMeasure();
       if(typeof ResizeObserver !== 'undefined'){
         logosRO = new ResizeObserver(scheduleMeasure);
         logosRO.observe(logos);
+      } else {
+        window.addEventListener('resize', scheduleMeasure);
       }
     }catch(e){}
   }
