@@ -354,7 +354,7 @@ function buildStaticTvHtml(h: Hallway): string {
   const logosBgStyle = logosBg ? ` style="background:${escapeHtml(logosBg)}"` : "";
   const logosHtml = h.logosEnabled && logos.length
     ? `<div id="logos" data-animate="${h.logosAnimate ? "true" : "false"}"${logosBgStyle}>
-         <div class="logos-track" id="logos-track">
+         <div class="logos-track" id="logos-track" data-base-count="${logos.length}">
            ${logos
              .map(
                (logo) =>
@@ -367,7 +367,7 @@ function buildStaticTvHtml(h: Hallway): string {
 
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
-#container{position:relative;height:100vh;width:100vw;overflow:hidden}
+#container{position:relative;height:100vh;width:100vw;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
 #scale-root{max-width:100%}
 #header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px;max-width:100%}
 #clock{max-width:100%}
@@ -405,7 +405,7 @@ function buildStaticTvHtml(h: Hallway): string {
 .apt-name{font-weight:700;font-size:calc(14px * var(--main-scale, 1));line-height:1.4286}
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
-.info-content p:empty::before{content:'\\u00a0';display:inline-block}
+.info-content p:empty::before{content:'\\00a0';display:inline-block}
 #news{margin-top:0}
 #news > .news-title{font-weight:700;letter-spacing:.04em;margin-bottom:10px;font-size:calc(var(--news-title-px, 18px) * var(--news-scale, 1))}
 .news-item .news-title{font-weight:400;font-size:100%}
@@ -535,7 +535,7 @@ function buildStaticTvHtml(h: Hallway): string {
     var scaleH=innerH/(G.scrollHeight||1);
     var s=Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
     G.style.transform='translate(10px,10px) scale('+s+')';
-    G.style.transformOrigin='top left';
+    G.style.transformOrigin='center top';
     if(H){
       var scaledW = (G.scrollWidth||1) * s;
       H.style.width = scaledW + 'px';
@@ -648,39 +648,110 @@ function buildStaticTvHtml(h: Hallway): string {
         }).join('') : '<div class="news-item opacity-60">-</div>';
       }).catch(function(){});
   }
+  var logosAnim = null;
+  var logosAnimMeta = null;
+  var logosMeasure = { width: 0, span: 0, repeat: 1 };
+  var logosReady = false;
+  var logosRaf = 0;
+  var logosRO = null;
+  var logosImgListeners = [];
+  function cleanupLogos(){
+    if(logosAnim){ logosAnim.cancel(); logosAnim = null; }
+    logosAnimMeta = null;
+    logosReady = false;
+    logosMeasure = { width: 0, span: 0, repeat: 1 };
+    if(logosRO){ logosRO.disconnect(); logosRO = null; }
+    logosImgListeners.forEach(function(x){ x.img.removeEventListener('load', x.fn); });
+    logosImgListeners = [];
+    if(logosRaf){ cancelAnimationFrame(logosRaf); logosRaf = 0; }
+  }
   function setupLogos(){
     try{
       var logos = document.getElementById('logos');
       var track = document.getElementById('logos-track');
+      cleanupLogos();
       if(!logos || !track) return;
       var animate = logos.getAttribute('data-animate') === 'true';
       if(animate) logos.classList.add('logos-animate');
       else logos.classList.remove('logos-animate');
+      track.style.animation = animate ? 'none' : '';
       if(!animate) return;
       if(!track.getAttribute('data-original-html')){
-        track.setAttribute('data-original-html', track.innerHTML);
-        track.setAttribute('data-original-count', String(track.children.length));
+        var baseCountAttr = parseInt(track.getAttribute('data-base-count') || '0', 10);
+        var baseCountFromDom = track.children.length;
+        var baseCountSeed = baseCountAttr > 0 ? Math.min(baseCountAttr, baseCountFromDom) : baseCountFromDom;
+        var baseNodes = Array.prototype.slice.call(track.children, 0, baseCountSeed);
+        var baseHtml = baseNodes.map(function(node){ return node.outerHTML; }).join('');
+        track.setAttribute('data-original-html', baseHtml);
+        track.setAttribute('data-original-count', String(baseCountSeed));
       }
       var originalHtml = track.getAttribute('data-original-html') || '';
       var baseCount = parseInt(track.getAttribute('data-original-count') || '0', 10);
       if(!originalHtml || !baseCount) return;
       track.innerHTML = originalHtml;
-      var lastBase = track.children[baseCount - 1];
-      if(!lastBase) return;
-      var baseWidth = lastBase.offsetLeft + lastBase.offsetWidth;
-      if(!baseWidth) return;
-      var repeat = Math.max(1, Math.ceil(logos.clientWidth / baseWidth));
-      var tiledHtml = '';
-      for(var i=0;i<repeat;i++){ tiledHtml += originalHtml; }
-      track.innerHTML = tiledHtml + tiledHtml;
-      var setCount = baseCount * repeat;
-      var first = track.children[0];
-      var second = track.children[setCount];
-      var span = (first && second) ? (second.offsetLeft - first.offsetLeft) : (baseWidth * repeat);
-      var start = 0;
-      var end = -span;
-      track.style.setProperty('--logos-start', start + 'px');
-      track.style.setProperty('--logos-end', end + 'px');
+      function bindImages(){
+        logosImgListeners.forEach(function(x){ x.img.removeEventListener('load', x.fn); });
+        logosImgListeners = [];
+        var imgs = Array.from(track.querySelectorAll('img'));
+        imgs.forEach(function(img){
+          var fn = function(){ scheduleMeasure(); };
+          img.addEventListener('load', fn, { once: true });
+          logosImgListeners.push({ img: img, fn: fn });
+        });
+      }
+      function startAnim(span){
+        var speedStr = getComputedStyle(logos).getPropertyValue('--logos-speed');
+        var speed = parseFloat(speedStr) || 20;
+        if(!logosAnimMeta || logosAnimMeta.span !== span || logosAnimMeta.speed !== speed){
+          if(logosAnim) logosAnim.cancel();
+          logosAnim = track.animate(
+            [{ transform: "translate3d(0, 0, 0)" }, { transform: "translate3d(" + (-span) + "px, 0, 0)" }],
+            { duration: speed * 1000, iterations: Infinity, easing: "linear" }
+          );
+          logosAnimMeta = { span: span, speed: speed };
+        }
+      }
+      function measure(){
+        var children = track.children;
+        var lastBase = children[baseCount - 1];
+        if(!lastBase) return;
+        var baseWidth = lastBase.offsetLeft + lastBase.offsetWidth;
+        if(!Number.isFinite(baseWidth) || baseWidth <= 0) return;
+        var wrapWidth = logos.clientWidth;
+        var nextRepeat = Math.max(1, Math.ceil(wrapWidth / baseWidth));
+        if(logosMeasure.repeat !== nextRepeat){
+          logosMeasure.repeat = nextRepeat;
+          var tiledHtml = '';
+          for(var i=0;i<nextRepeat;i++){ tiledHtml += originalHtml; }
+          track.innerHTML = tiledHtml + tiledHtml;
+          logosReady = false;
+          bindImages();
+          scheduleMeasure();
+          return;
+        }
+        var setCount = baseCount * nextRepeat;
+        var first = children[0];
+        var second = children[setCount];
+        var span = (first && second) ? (second.offsetLeft - first.offsetLeft) : (baseWidth * nextRepeat);
+        logosMeasure.width = wrapWidth;
+        logosMeasure.span = span;
+        if(!logosReady){
+          var baseImages = Array.from(children).slice(0, baseCount).map(function(el){ return el.querySelector('img'); }).filter(Boolean);
+          var allLoaded = baseImages.length > 0 && baseImages.every(function(img){ return img.complete; });
+          if(allLoaded) logosReady = true;
+        }
+        if(logosReady) startAnim(span);
+      }
+      function scheduleMeasure(){
+        if(logosRaf) cancelAnimationFrame(logosRaf);
+        logosRaf = requestAnimationFrame(function(){ logosRaf = 0; measure(); });
+      }
+      bindImages();
+      scheduleMeasure();
+      if(typeof ResizeObserver !== 'undefined'){
+        logosRO = new ResizeObserver(scheduleMeasure);
+        logosRO.observe(logos);
+      }
     }catch(e){}
   }
   window.addEventListener('resize', fit);
@@ -1508,7 +1579,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <ScrollArea className="h-[60vh] pr-2">
                     <div className="space-y-4">
                       {sortedFloors.map((floor) => (
-                        <motion.div key={floor.id} layout className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
+                        <motion.div key={floor.id} className="rounded-2xl p-3 pt-[35px] relative bg-[#dddddd]">
                           <button aria-label="Poista kerros" title="Poista kerros" onClick={() => deleteFloor(floor.id)} className="absolute top-5 right-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
                           <div className="grid grid-cols-12 gap-2 items-center">
                             <div className="col-span-12 md:col-span-6">
@@ -1528,7 +1599,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
                               <div className="mt-2 grid grid-cols-1 gap-3">
                                 {floor.apartments.map((apt, aptIdx) => (
-                                  <div key={apt.id} className="rounded-xl p-3 pb-4 bg-[#cccccc] relative">
+                                  <motion.div
+                                    key={apt.id}
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    transition={{ duration: 0.1, ease: "linear" }}
+                                    className="rounded-xl p-3 pb-4 bg-[#cccccc] relative"
+                                    style={{ overflow: "hidden" }}
+                                  >
                                     <button aria-label="Poista asunto" title="Poista asunto" onClick={() => deleteApartment(floor.id, apt.id)} className="absolute top-3 right-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl px-[3px] py-1"><Trash2 className="h-4 w-4"/></button>
                                     <div className="grid grid-cols-1 md:grid-cols-[minmax(50px,1fr)_4fr] gap-x-4 gap-y-2">
                                       <Label>Numero</Label>
@@ -1554,7 +1632,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                                         ))}
                                       </div>
                                     </div>
-                                  </div>
+                                  </motion.div>
                                 ))}
                               </div>
                             </div>
