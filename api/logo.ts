@@ -1,5 +1,5 @@
 // api/logo.ts
-import { put } from "@vercel/blob";
+import { storage } from "./storage.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -31,11 +31,12 @@ export default async function handler(req: any, res: any) {
   const key = `logos/${safeName}`;
 
   try {
-    const { url } = await put(key, buffer, {
-      access: "public",
-      addRandomSuffix: true,
+    const { url } = await storage.saveBinary({
+      key,
+      buffer,
       contentType,
-      cacheControlMaxAge: 0,
+      addRandomSuffix: true,
+      req,
     });
     res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(200).json({ ok: true, url, name: filenameRaw.replace(/\.[^.]+$/, "") });

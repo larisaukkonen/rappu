@@ -1,5 +1,5 @@
 // api/ruutu/[serial].ts
-import { put } from "@vercel/blob";
+import { storage } from "../storage.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -26,14 +26,14 @@ export default async function handler(req: any, res: any) {
   const key = `${dir}/${filename}`;
 
   try {
-    const { url } = await put(key, Buffer.from(html, "utf8"), {
-      access: "public",
+    const { url, key: savedKey } = await storage.saveHtml({
+      key,
+      html,
       addRandomSuffix: false,
-      contentType: "text/html; charset=utf-8",
-      cacheControlMaxAge: 0,
+      req,
     });
     res.setHeader("Access-Control-Allow-Origin", "*");
-    return res.status(200).json({ ok: true, url, key });
+    return res.status(200).json({ ok: true, url, key: savedKey });
   } catch (e: any) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(500).send(`Blob save failed: ${e?.message || String(e)}`);

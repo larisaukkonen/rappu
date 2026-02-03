@@ -1,5 +1,5 @@
 ﻿// api/serve-ruutu.ts
-import { list } from "@vercel/blob";
+import { storage } from "./storage.ts";
 
 // /ruutu/<file> â†’ /api/serve-ruutu?key=ruutu/<file>
 export default async function handler(req: any, res: any) {
@@ -37,11 +37,6 @@ export default async function handler(req: any, res: any) {
     const hasTvParam = isTruthy(getQuery("tv"));
     const wantsRaw = isTruthy(getQuery("raw"));
 
-    // Etsi blob
-    const { blobs } = await list({ prefix: key, limit: 1 });
-    const entry = blobs.find((b) => b.pathname === key) ?? blobs[0];
-    if (!entry) return res.status(404).send("Not Found");
-
     // Headers to allow embedding (iframe) and cross-origin resource loads
     const allowEmbed = () => {
       const frameAncestors = (process.env.FRAME_ANCESTORS || "*").trim();
@@ -56,13 +51,10 @@ export default async function handler(req: any, res: any) {
       res.setHeader("Referrer-Policy", "no-referrer");
     };
 
-    // 1) Adminin raakapyyntÃ¶
+    // 1) Adminin raakapyyntö
     if (wantsRaw) {
-      const sep = entry.url.includes('?') ? '&' : '?';
-      const freshUrl = `${entry.url}${sep}ts=${Date.now()}`;
-      const r = await fetch(freshUrl);
-      if (!r.ok) return res.status(502).send("Upstream fetch failed");
-      const html = await r.text();
+      const html = await storage.getHtmlByKey({ key });
+      if (!html) return res.status(404).send("Not Found");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Cache-Control", "no-store");
       allowEmbed();
@@ -75,21 +67,22 @@ export default async function handler(req: any, res: any) {
       return res.redirect(302, `/?serial=${encodeURIComponent(serial)}`);
     }
 
-    // 3) TV/webview â†’ Blobin julkiseen URL:iin
+    // 3) TV/webview → serve HTML
     if (isTv || hasTvParam) {
-      const sep = entry.url.includes('?') ? '&' : '?';
-      const freshUrl = `${entry.url}${sep}ts=${Date.now()}`;
-      const r = await fetch(freshUrl);
-      if (!r.ok) return res.status(502).send("Upstream fetch failed");
-      const html = await r.text();
+      const html = await storage.getHtmlByKey({ key });
+      if (!html) return res.status(404).send("Not Found");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Cache-Control", "public, max-age=60");
       allowEmbed();
       return res.status(200).send(html);
     }
 
+    const html = await storage.getHtmlByKey({ key });
+    if (!html) return res.status(404).send("Not Found");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=60");
-    return res.redirect(302, entry.url);
+    allowEmbed();
+    return res.status(200).send(html);
   } catch (err: any) {
     return res.status(500).send(`Error: ${err?.message || String(err)}`);
   }

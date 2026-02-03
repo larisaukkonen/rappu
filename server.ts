@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const dataDir = process.env.DATA_DIR || "data";
 
 app.set("trust proxy", true);
 
@@ -53,6 +54,7 @@ app.get("/api/hello", (_req, res) => {
 // Serve Vite build output
 const distDir = path.join(__dirname, "dist");
 app.use(express.static(distDir, { index: false }));
+app.use("/files", express.static(path.resolve(dataDir), { index: false }));
 
 // SPA fallback
 app.get("*", (_req, res) => {
