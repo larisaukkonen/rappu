@@ -1,5 +1,5 @@
 // api/ruutu/index.ts
-import { storage } from "../storage.ts";
+import { storage } from "../storage";
 
 export default async function handler(req: any, res: any) {
   // Basic CORS for cross-origin saves if used from other origins

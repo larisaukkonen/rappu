@@ -1,5 +1,5 @@
 ﻿// api/serve-ruutu.ts
-import { storage } from "./storage.ts";
+import { storage } from "./storage";
 
 // /ruutu/<file> â†’ /api/serve-ruutu?key=ruutu/<file>
 export default async function handler(req: any, res: any) {

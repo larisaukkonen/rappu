@@ -1,5 +1,5 @@
 // api/ruutu/[serial].ts
-import { storage } from "../storage.ts";
+import { storage } from "../storage";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
