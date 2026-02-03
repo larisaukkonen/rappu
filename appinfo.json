@@ -1,0 +1,8 @@
+{
+  "id": "com.infovisio.app.rappu",
+  "title": "Rappu",
+  "type": "web",
+  "main": "index.html",
+  "icon": "icon.png",
+  "version": "1.0.0"
+}
