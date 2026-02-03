@@ -844,6 +844,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [logosSpeedInput, setLogosSpeedInput] = useState<string>("20");
   const [logosSpeedTouched, setLogosSpeedTouched] = useState<boolean>(false);
+  const savedUrlInputRef = useRef<HTMLInputElement | null>(null);
+  const savedUrlDialogInputRef = useRef<HTMLInputElement | null>(null);
 
   // Käynnistyspromptti
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
@@ -863,6 +865,12 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     setSavedHtml(html);
     setSavedFilename(filename);
     setSavedUrl(absUrl.toString());
+  };
+
+  const copySavedUrl = (input: HTMLInputElement | null) => {
+    const value = input?.value?.trim() || savedUrl || "";
+    if (!value) return;
+    navigator.clipboard.writeText(value);
   };
 
   useEffect(() => {
@@ -1442,13 +1450,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                   <div className="flex gap-2">
                     <Input
                       readOnly
+                      ref={savedUrlInputRef}
                       value={savedUrl || ""}
                       placeholder={"N\u00e4kym\u00e4\u00e4 ei ole tallennettu"}
                     />
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => savedUrl && navigator.clipboard.writeText(savedUrl)}
+                      onClick={() => copySavedUrl(savedUrlInputRef.current)}
                       disabled={!savedUrl}
                       className="rounded-2xl"
                       aria-label="Kopioi URL"
@@ -2086,8 +2095,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <p>Näkymä tallennettu. TV hakee sen omalla sarjanumerollaan.</p>
             <div className="text-sm">Absoluuttinen URL:</div>
             <div className="flex gap-2">
-              <Input readOnly value={savedUrl || ""} />
-              <Button type="button" onClick={() => savedUrl && navigator.clipboard.writeText(savedUrl)}>Kopioi</Button>
+              <Input readOnly ref={savedUrlDialogInputRef} value={savedUrl || ""} />
+              <Button type="button" onClick={() => copySavedUrl(savedUrlDialogInputRef.current)}>Kopioi</Button>
               <Button type="button" onClick={() => savedHtml && downloadStaticHtmlFile(savedFilename || "ruutu.html", savedHtml)} disabled={!savedHtml}>Lataa</Button>
             </div>
           </div>
