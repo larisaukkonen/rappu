@@ -17,6 +17,7 @@ export default async function handler(req: any, res: any) {
 
   const dataUrl = String(body?.dataUrl || "");
   const filenameRaw = String(body?.filename || "");
+  const serialRaw = String(body?.serial || "");
   if (!dataUrl.startsWith("data:") || !dataUrl.includes(";base64,")) {
     return res.status(400).send("Invalid dataUrl");
   }
@@ -28,7 +29,8 @@ export default async function handler(req: any, res: any) {
   const buffer = Buffer.from(base64, "base64");
 
   const safeName = filenameRaw.replace(/[^a-zA-Z0-9._-]/g, "") || `logo-${Date.now()}`;
-  const key = `logos/${safeName}`;
+  const safeSerial = serialRaw.trim().replace(/[^a-zA-Z0-9._-]/g, "");
+  const key = safeSerial ? `logos/${safeSerial}/${safeName}` : `logos/${safeName}`;
 
   try {
     const { url } = await storage.saveBinary({

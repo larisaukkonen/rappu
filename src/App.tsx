@@ -1053,10 +1053,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
   const uploadLogoFile = async (file: File, signal?: AbortSignal) => {
     const dataUrl = await readFileAsDataUrl(file);
+    const serial = (hallway.serial || "").trim();
     const res = await fetch("/api/logo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl, filename: file.name }),
+      body: JSON.stringify({ dataUrl, filename: file.name, serial }),
       signal,
     });
     if (!res.ok) throw new Error(await res.text());
