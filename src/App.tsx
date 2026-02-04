@@ -1062,7 +1062,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
     });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    return { url: String(data.url || ""), name: String(data.name || "") };
+    const rawUrl = String(data.url || "");
+    const url = rawUrl.startsWith("/") && typeof window !== "undefined"
+      ? `${window.location.origin}${rawUrl}`
+      : rawUrl;
+    return { url, name: String(data.name || "") };
   };
 
 
