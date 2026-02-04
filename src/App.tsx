@@ -464,26 +464,26 @@ function buildStaticTvHtml(h: Hallway): string {
 </head>
 <body data-scale="${Number(h.scale ?? 1)}" data-build-id="${buildId}">
 <div id="container" style="--main-scale:${mainScale};--clock-scale:${weatherScale};--news-scale:${newsScale};--info-scale:${infoScale};--header-scale:${headerScale};--news-title-px:${newsTitlePx}px;--logos-gap:${typeof h.logosGap === "number" && isFinite(h.logosGap) ? h.logosGap : 32}px;--logos-speed:${logosSpeed}s;">
-    <div id="header">
-      <div id="brand">
-        ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
-        <div class="subtitle">${escapeHtml(h.name)}</div>
-      </div>
-      ${h.weatherClockEnabled ? `
-      <div id="clock" aria-label="Aika, päivämäärä ja sää">
-        <div class="td">
-          <div id="time" class="time">--.--</div>
-          <div id="date" class="date">--.--.----</div>
-        </div>
-        <div id="wxicon" class="icon" aria-hidden="true"></div>
-        <div class="temps">
-          <div id="tmax">? °C</div>
-          <div id="tmin" class="min">? °C</div>
-        </div>
-      </div>` : ""}
-    </div>
     ${orientation === "portrait" ? `<div id="scale-root" style="width:${baseW}px">` : ""}
     <div id="content" style="width:${baseW}px">
+      <div id="header">
+        <div id="brand">
+          ${buildingName ? `<div class="title">${escapeHtml(buildingName)}</div>` : ""}
+          <div class="subtitle">${escapeHtml(h.name)}</div>
+        </div>
+        ${h.weatherClockEnabled ? `
+        <div id="clock" aria-label="Aika, päivämäärä ja sää">
+          <div class="td">
+            <div id="time" class="time">--.--</div>
+            <div id="date" class="date">--.--.----</div>
+          </div>
+          <div id="wxicon" class="icon" aria-hidden="true"></div>
+          <div class="temps">
+            <div id="tmax">? °C</div>
+            <div id="tmin" class="min">? °C</div>
+          </div>
+        </div>` : ""}
+      </div>
       <div id="main">
         <div class="cols ${infoHtml || newsEnabled ? "cols-2" : "cols-1"}">
           <div class="col col-main">
@@ -526,7 +526,8 @@ function buildStaticTvHtml(h: Hallway): string {
     var F=document.getElementById('footer');
     if(!C||!G){return;}
     var ch=C.clientHeight; var cw=C.clientWidth;
-    var usedTop=H?H.getBoundingClientRect().height:0;
+    var headerInside = !!(H && G && G.contains(H));
+    var usedTop = headerInside ? 0 : (H ? H.getBoundingClientRect().height : 0);
     var usedBottom=F?F.getBoundingClientRect().height:0;
     var availH=Math.max(0,ch-usedTop-usedBottom);
     var innerW=Math.max(0, cw-20);
@@ -536,7 +537,7 @@ function buildStaticTvHtml(h: Hallway): string {
     var s=Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
     G.style.transform='translate(10px,10px) scale('+s+')';
     G.style.transformOrigin='center top';
-    if(H){
+    if(H && !headerInside){
       var scaledW = (G.scrollWidth||1) * s;
       H.style.width = scaledW + 'px';
       H.style.marginLeft = '10px';
