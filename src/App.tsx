@@ -374,7 +374,13 @@ function buildStaticTvHtml(h: Hallway): string {
 #brand{background:transparent}
 #brand .title{font-size:calc(28px * var(--header-scale, 1));font-weight:600;letter-spacing:.02em}
 #brand .subtitle{opacity:.7;margin-top:-4px;font-size:calc(14px * var(--header-scale, 1))}
-#clock{display:flex;align-items:center;gap:16px}
+#clock{display:flex;align-items:center}
+#clock > *{margin-right:16px}
+#clock > *:last-child{margin-right:0}
+@supports (gap:1px){
+#clock{gap:16px}
+#clock > *{margin-right:0}
+}
 #clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
 #clock .date{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
 #clock .temps{font-size:calc(14px * var(--clock-scale, 1));line-height:1.1}
@@ -399,9 +405,13 @@ function buildStaticTvHtml(h: Hallway): string {
 .floor{margin-bottom:24px;padding-bottom:15px}
 .floor-title{font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;font-size:calc(22px * var(--main-scale, 1))}
 .apt-list{display:flex;flex-direction:column;gap:12px}
+.apt-row{display:flex;align-items:flex-start}
+.apt-num{width:calc(30px * var(--main-scale, 1));margin-right:24px;flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums;font-size:calc(14px * var(--main-scale, 1));white-space:nowrap}
+.apt-names{min-width:0;flex:1}
+@supports (display:grid){
 .apt-row{display:grid;grid-template-columns:calc(30px * var(--main-scale, 1)) 1fr;column-gap:24px}
-.apt-num{font-weight:700;font-variant-numeric:tabular-nums;font-size:calc(14px * var(--main-scale, 1));white-space:nowrap}
-.apt-names{min-width:0}
+.apt-num{width:auto;margin-right:0}
+}
 .apt-name{font-weight:700;font-size:calc(14px * var(--main-scale, 1));line-height:1.4286}
 .empty{opacity:.4}
 #footer{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;opacity:.7;padding:8px}
@@ -409,7 +419,13 @@ function buildStaticTvHtml(h: Hallway): string {
 #news{margin-top:0}
 #news > .news-title{font-weight:700;letter-spacing:.04em;margin-bottom:10px;font-size:calc(var(--news-title-px, 18px) * var(--news-scale, 1))}
 .news-item .news-title{font-weight:400;font-size:100%}
-#news .news-list{display:flex;flex-direction:column;gap:10px}
+#news .news-list{display:flex;flex-direction:column}
+#news .news-item{margin-bottom:10px}
+#news .news-item:last-child{margin-bottom:0}
+@supports (gap:1px){
+#news .news-list{gap:10px}
+#news .news-item{margin-bottom:0}
+}
 #news .news-item{display:flex;gap:8px;font-size:calc(14px * var(--news-scale, 1));line-height:1.2}
 #news .news-num{font-weight:700;background:#fff;color:#000;padding:4px;display:block;border-radius:6px;margin-right:5px}
 #news .news-text{display:flex;flex-direction:column;gap:2px}
