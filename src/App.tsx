@@ -382,9 +382,9 @@ function buildStaticTvHtml(h: Hallway): string {
 #clock > *{margin-right:0}
 }
 #clock .clock-col{display:flex;flex-direction:column;align-items:center;line-height:1.1;text-align:center}
-#clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
+#clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:700}
 #clock .day,#clock .date,#clock .city{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
-#clock .temp-max{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
+#clock .temp-max{font-size:calc(28px * var(--clock-scale, 1));font-weight:700}
 #clock .temp-min{font-size:calc(12px * var(--clock-scale, 1));opacity:.8}
 #clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
 #clock .icon svg{width:100%;height:100%}
