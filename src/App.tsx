@@ -381,9 +381,11 @@ function buildStaticTvHtml(h: Hallway): string {
 #clock{gap:16px}
 #clock > *{margin-right:0}
 }
+#clock .clock-col{display:flex;flex-direction:column;align-items:center;line-height:1.1;text-align:center}
 #clock .time{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
-#clock .date{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
-#clock .temps{font-size:calc(14px * var(--clock-scale, 1));line-height:1.1}
+#clock .day,#clock .date,#clock .city{font-size:calc(12px * var(--clock-scale, 1));opacity:.7}
+#clock .temp-max{font-size:calc(28px * var(--clock-scale, 1));font-weight:600}
+#clock .temp-min{font-size:calc(12px * var(--clock-scale, 1));opacity:.8}
 #clock .icon{width:calc(32px * var(--clock-scale, 1));height:calc(32px * var(--clock-scale, 1))}
 #clock .icon svg{width:100%;height:100%}
 #content{position:relative;padding:0;transform-origin:top left;display:flex;flex-direction:column;height:${contentHeight}px}
@@ -489,14 +491,16 @@ function buildStaticTvHtml(h: Hallway): string {
         </div>
         ${h.weatherClockEnabled ? `
         <div id="clock" aria-label="Aika, päivämäärä ja sää">
-          <div class="td">
+          <div class="clock-col">
+            <div id="day" class="day">--</div>
             <div id="time" class="time">--.--</div>
             <div id="date" class="date">--.--.----</div>
           </div>
           <div id="wxicon" class="icon" aria-hidden="true"></div>
-          <div class="temps">
-            <div id="tmax">? °C</div>
-            <div id="tmin" class="min">? °C</div>
+          <div class="clock-col">
+            <div id="city" class="city">--</div>
+            <div id="tmax" class="temp-max">? °C</div>
+            <div id="tmin" class="temp-min">? °C</div>
           </div>
         </div>` : ""}
       </div>
@@ -573,14 +577,25 @@ function buildStaticTvHtml(h: Hallway): string {
     var hh=pad2(d.getHours()); var mm=pad2(d.getMinutes());
     var t=hh+'.'+mm;
     var ds=pad2(d.getDate())+'.'+pad2(d.getMonth()+1)+'.'+d.getFullYear();
-    var te=document.getElementById('time'); var de=document.getElementById('date');
+    var dayStr = '';
+    try{
+      dayStr = d.toLocaleDateString('fi-FI',{weekday:'long'});
+    }catch(e){
+      dayStr = '';
+    }
+    var te=document.getElementById('time'); var de=document.getElementById('date'); var dy=document.getElementById('day');
     if(te) te.textContent=t;
     if(de) de.textContent=ds;
+    if(dy) dy.textContent=dayStr || '--';
   }
   function setTemps(tmax,tmin){
     var a=document.getElementById('tmax'); var b=document.getElementById('tmin');
     if(a) a.textContent = (isFinite(tmax)? Math.round(tmax): '?') + ' °C';
     if(b) b.textContent = (isFinite(tmin)? Math.round(tmin): '?') + ' °C';
+  }
+  function setCity(name){
+    var c=document.getElementById('city');
+    if(c) c.textContent = (name||'').trim() || 'Helsinki';
   }
   function iconFor(code){
     // Minimal inline SVG icons to avoid external deps
@@ -612,6 +627,7 @@ function buildStaticTvHtml(h: Hallway): string {
     var fallbackCity = 'Helsinki';
     var fallbackCoords = { lat: 60.1699, lon: 24.9384 };
     var cityName = (CITY || '').trim() || fallbackCity;
+    setCity(cityName);
     var geoPromise;
     if(LAT!==null && LON!==null) geoPromise = Promise.resolve({lat:LAT, lon:LON});
     else geoPromise = fetch(resolveUrl('https://geocoding-api.open-meteo.com/v1/search',{name:cityName,count:'1',language:'fi',format:'json'}),{cache:'no-store'})
