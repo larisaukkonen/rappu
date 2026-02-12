@@ -66,6 +66,20 @@ html, body {
   display: block;
   width: 100%;
 }
+[role="tablist"].tablist-desktop {
+  display: none;
+}
+[role="tablist"].tablist-mobile {
+  display: flex;
+}
+@media (min-width: 640px) {
+  [role="tablist"].tablist-desktop {
+    display: flex;
+  }
+  [role="tablist"].tablist-mobile {
+    display: none;
+  }
+}
 
 /* Logos carousel (preview) */
 .logos-track {

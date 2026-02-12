@@ -1389,7 +1389,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               </div>
             )}
           </div>
-          <div role="tablist" className="hidden sm:flex gap-3">
+          <div role="tablist" className="tablist-desktop hidden sm:flex gap-3">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
