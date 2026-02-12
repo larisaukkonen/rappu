@@ -909,6 +909,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const [showStartupPrompt, setShowStartupPrompt] = useState<boolean>(true);
   const [startupSerial, setStartupSerial] = useState<string>("");
   const [startupError, setStartupError] = useState<string>("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Lukitusluokka gridiin (ettei wrapata kolumnit rikki)
   const lockClass = showStartupPrompt ? "pointer-events-none select-none blur-[1px]" : "";
@@ -1041,6 +1042,15 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const logosSpeedValue = logosSpeedInput.trim();
   const logosSpeedNum = logosSpeedValue ? Number(logosSpeedValue) : NaN;
   const logosSpeedValid = Number.isFinite(logosSpeedNum) && logosSpeedNum >= 5 && logosSpeedNum <= 120;
+  const tabs = [
+    { key: "hallinta", label: "Asetukset" },
+    { key: "otsikko", label: "Otsikko" },
+    { key: "asunnot", label: "Asunnot" },
+    { key: "saa", label: "Sää + aika" },
+    { key: "uutiset", label: "Uutiset" },
+    { key: "mainokset", label: "Mainokset" },
+    { key: "info", label: "Info" },
+  ] as const;
 
   // Jos URLissa on ?serial=ABC, yritä hakea talletettu näkymä automaattisesti adminissa
   useEffect(() => {
@@ -1349,15 +1359,51 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
       {/* Top header: brand + tabs + save */}
       <div className="mb-4 border-b col-span-full w-full">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xl font-semibold">Infovisio</div>
-          <div role="tablist" className="flex gap-3">
-            <button role="tab" aria-selected={activeTab === "hallinta"} onClick={() => setActiveTab("hallinta")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "hallinta" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asetukset</button>
-            <button role="tab" aria-selected={activeTab === "otsikko"} onClick={() => setActiveTab("otsikko")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "otsikko" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Otsikko</button>
-            <button role="tab" aria-selected={activeTab === "asunnot"} onClick={() => setActiveTab("asunnot")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "asunnot" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Asunnot</button>
-            <button role="tab" aria-selected={activeTab === "saa"} onClick={() => setActiveTab("saa")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "saa" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Sää + aika</button>
-            <button role="tab" aria-selected={activeTab === "uutiset"} onClick={() => setActiveTab("uutiset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "uutiset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Uutiset</button>
-            <button role="tab" aria-selected={activeTab === "mainokset"} onClick={() => setActiveTab("mainokset")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "mainokset" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Mainokset</button>
-            <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Avaa valikko"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border bg-white text-black"
+            >
+              <span className="text-lg leading-none">≡</span>
+            </button>
+            {mobileMenuOpen && (
+              <div className="absolute left-0 mt-2 w-48 rounded-md border bg-white text-black shadow-lg z-20 sm:hidden">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.key}
+                    onClick={() => { setActiveTab(tab.key); setMobileMenuOpen(false); }}
+                    className={cn(
+                      "block w-full text-left px-3 py-2 text-sm",
+                      activeTab === tab.key ? "bg-zinc-100 font-semibold" : "text-zinc-700 hover:bg-zinc-50"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div role="tablist" className="hidden sm:flex gap-3">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "px-3 py-2 -mb-px border-b-2",
+                  activeTab === tab.key ? "border-black font-semibold" : "border-transparent text-zinc-600"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 hidden">
@@ -1365,7 +1411,26 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
               <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
             </div>
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Vaihda suunta"
+              title="Vaihda suunta"
+              onClick={() =>
+                setHallway((h) => ({ ...h, orientation: (h.orientation || "landscape") === "portrait" ? "landscape" : "portrait" }))
+              }
+              className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border bg-white text-black"
+            >
+              {(hallway.orientation || "landscape") === "portrait" ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M10 16h4c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1v-1a2 2 0 1 0-4 0v1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1m.8-6c0-.66.54-1.2 1.2-1.2s1.2.54 1.2 1.2v1h-2.4zM17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2m0 18H7V5h10z"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M21 5H3c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m-2 12H5V7h14zm-9-1h4c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1v-1a2 2 0 1 0-4 0v1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1m.8-6c0-.66.54-1.2 1.2-1.2s1.2.54 1.2 1.2v1h-2.4z"/>
+                </svg>
+              )}
+            </button>
+            <div className="hidden sm:flex items-center gap-2">
               <Label htmlFor="orientation" className="text-sm font-normal">Suunta</Label>
               <select
                 id="orientation"
@@ -1377,7 +1442,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 <option value="landscape">Vaaka</option>
               </select>
             </div>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="hidden sm:flex items-center gap-2 text-sm">
               <span>Esikatselu</span>
               <button
                 type="button"
@@ -1397,12 +1462,32 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 />
               </button>
             </label>
+            <button
+              type="button"
+              aria-label={showPreview ? "Piilota esikatselu" : "Näytä esikatselu"}
+              title={showPreview ? "Piilota esikatselu" : "Näytä esikatselu"}
+              onClick={() => setShowPreview((prev) => !prev)}
+              className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border bg-white text-black"
+            >
+              {showPreview ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5a2 2 0 0 0-2-2m0 16H5V7h14zm-7-8.5c1.84 0 3.48.96 4.34 2.5c-.86 1.54-2.5 2.5-4.34 2.5s-3.48-.96-4.34-2.5c.86-1.54 2.5-2.5 4.34-2.5M12 9c-2.73 0-5.06 1.66-6 4c.94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 5.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M19 19H5V7h14zm-7-8.5c1.84 0 3.48.96 4.34 2.5c-.86 1.54-2.5 2.5-4.34 2.5s-3.48-.96-4.34-2.5c.86-1.54 2.5-2.5 4.34-2.5M12 9c-2.73 0-5.06 1.66-6 4c.94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 5.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5" opacity="0.3"/>
+                  <path fill="currentColor" d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5a2 2 0 0 0-2-2m0 16H5V7h14zm-7-8.5c1.84 0 3.48.96 4.34 2.5c-.86 1.54-2.5 2.5-4.34 2.5s-3.48-.96-4.34-2.5c.86-1.54 2.5-2.5 4.34-2.5M12 9c-2.73 0-5.06 1.66-6 4c.94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 5.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5"/>
+                </svg>
+              )}
+            </button>
             <span className="inline-flex" title={!hallway.serial?.trim() ? "Näkymää ei voi tallentaa ilman sarjanumeroa (määritetään Asetukset-välilehdellä)." : "Tallenna näkymä annetulla sarjanumerolla."}>
             <Button
               onClick={handleSave}
               className={cn("rounded-2xl px-4", !hallway.serial?.trim() && "text-red-700")}
+              aria-label="Tallenna"
             >
-              <Save className="h-4 w-4 mr-2"/>Tallenna
+              <Save className="h-4 w-4 sm:mr-2"/>
+              <span className="hidden sm:inline">Tallenna</span>
             </Button>
             </span>
           </div>
