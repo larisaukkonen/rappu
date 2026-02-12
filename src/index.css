@@ -125,13 +125,24 @@ html, body {
 .news-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 .news-item {
+  margin-bottom: 10px;
   display: flex;
   gap: 8px;
   font-size: calc(14px * var(--preview-text-scale, 1));
   line-height: 1.2;
+}
+.news-item:last-child {
+  margin-bottom: 0;
+}
+@supports (gap: 1px) {
+  .news-list {
+    gap: 10px;
+  }
+  .news-item {
+    margin-bottom: 0;
+  }
 }
 .news-num {
   font-weight: 700;

@@ -235,6 +235,31 @@ function MiniScaleControl({
 
 // Polku ruudun julkaisuihin
 const RUUTU_DIR = "ruutu";
+const LEGACY_BASE_URL = "https://185.218.194.43";
+const PRIMARY_BASE_URL = "https://infovisio.duckdns.org";
+
+const replaceBaseInText = (value: string) => {
+  if (!value) return value;
+  return value.includes(LEGACY_BASE_URL) ? value.split(LEGACY_BASE_URL).join(PRIMARY_BASE_URL) : value;
+};
+
+const normalizeHallwayUrls = (hallway: Hallway): Hallway => {
+  if (!hallway) return hallway;
+  let changed = false;
+  const logos = (hallway.logos || []).map((logo) => {
+    if (!logo?.url) return logo;
+    const nextUrl = replaceBaseInText(logo.url);
+    if (nextUrl === logo.url) return logo;
+    changed = true;
+    return { ...logo, url: nextUrl };
+  });
+  const infoHtml = hallway.infoHtml ? replaceBaseInText(hallway.infoHtml) : hallway.infoHtml;
+  if (infoHtml !== hallway.infoHtml) changed = true;
+  const apartmentsExternalUrl = hallway.apartmentsExternalUrl ? replaceBaseInText(hallway.apartmentsExternalUrl) : hallway.apartmentsExternalUrl;
+  if (apartmentsExternalUrl !== hallway.apartmentsExternalUrl) changed = true;
+  if (!changed) return hallway;
+  return { ...hallway, logos, infoHtml, apartmentsExternalUrl };
+};
 
 // ---------- Backend-API:t (sovita omaan ympäristään) ----------
 async function fetchHallway(hallwayId: string): Promise<Hallway> {
@@ -913,13 +938,14 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         setLoading(true);
         const data = await fetchHallway(hallwayId).catch(() => emptyHallway());
         if (!mounted) return;
+        const normalized = normalizeHallwayUrls(data);
         // Esimerkkidata tyhjään näkymään
-        if (!data.floors.length) {
+        if (!normalized.floors.length) {
           const f1: Floor = { id: uid(), label: "Kerros 1", level: 1, apartments: [] };
           const f2: Floor = { id: uid(), label: "Kerros 2", level: 2, apartments: [] };
-          setHallway({ ...data, floors: [f2, f1], orientation: data.orientation || "landscape" });
+          setHallway({ ...normalized, floors: [f2, f1], orientation: normalized.orientation || "landscape" });
         } else {
-          setHallway({ ...data, orientation: data.orientation || "landscape" });
+          setHallway({ ...normalized, orientation: normalized.orientation || "landscape" });
         }
       } catch (e: any) {
         setError(e?.message || "Tuntematon virhe");
@@ -1030,7 +1056,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           const text = await res.text();
           const data = parseHallwayFromStaticHtml(text);
           if (!data) { setStartupError('Antamallasi sarjanumerolla ei löydy tallennettua näkymää.'); return; }
-          setHallway({ ...emptyHallway(), ...data, serial });
+          const normalized = normalizeHallwayUrls(data);
+          setHallway({ ...emptyHallway(), ...normalized, serial });
           applySavedViewMeta(serial, text);
           setShowStartupPrompt(false);
         } catch {
@@ -1059,7 +1086,8 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         setStartupError("Antamallasi sarjanumerolla ei löydy tallennettua näkymää.");
         return;
       }
-      setHallway({ ...emptyHallway(), ...data, serial });
+      const normalized = normalizeHallwayUrls(data);
+      setHallway({ ...emptyHallway(), ...normalized, serial });
       applySavedViewMeta(serial, text);
       setShowStartupPrompt(false);
     } catch (e) {
@@ -1207,7 +1235,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const saveWithSerial = async (serialOverride?: string) => {
     const serial = serialOverride ?? hallway.serial?.trim();
     if (!serial) return;
-    const hallwayToSave = serialOverride ? { ...hallway, serial } : hallway;
+    const hallwayToSave = normalizeHallwayUrls(serialOverride ? { ...hallway, serial } : hallway);
     try {
       setError("");
       setStatus("Tallennetaan...");
@@ -1332,7 +1360,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
             <button role="tab" aria-selected={activeTab === "info"} onClick={() => setActiveTab("info")} className={cn("px-3 py-2 -mb-px border-b-2", activeTab === "info" ? "border-black font-semibold" : "border-transparent text-zinc-600")}>Info</button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 hidden">
               <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.max(0.5, Math.round((((h.scale ?? 1) - 0.05) * 100)) / 100) }))}>-</Button>
               <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
               <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
