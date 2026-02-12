@@ -1357,7 +1357,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
         </div>
       )}
       {/* Top header: brand + tabs + save */}
-      <div className="mb-4 border-b col-span-full w-full">
+      <div className="mb-4 border-b border-transparent sm:border-zinc-200 col-span-full w-full">
         <div className="flex items-center justify-between gap-3">
           <div className="relative">
             <button
