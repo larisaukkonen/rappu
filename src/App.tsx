@@ -564,6 +564,8 @@ function buildStaticTvHtml(h: Hallway): string {
   var NEWS_LIMIT = ${newsLimit ?? "null"};
   var API_ORIGIN = ${JSON.stringify(apiOrigin)};
   var IS_PORTRAIT = ${orientation === "portrait" ? "true" : "false"};
+  var BASE_W = ${baseW};
+  var BASE_H = ${contentHeight};
   var IS_MOBILE = (function(){
     try {
       var ua = navigator.userAgent || "";
@@ -585,14 +587,16 @@ function buildStaticTvHtml(h: Hallway): string {
     var availH=Math.max(0,ch-usedTop-usedBottom);
     var innerW=Math.max(0, cw-20);
     var innerH=Math.max(0, availH-20);
-    var scaleW=innerW/(G.scrollWidth||1);
-    var scaleH=innerH/(G.scrollHeight||1);
+    var baseW = (typeof BASE_W === 'number' && BASE_W > 0) ? BASE_W : (G.scrollWidth||1);
+    var baseH = (typeof BASE_H === 'number' && BASE_H > 0) ? BASE_H : (G.scrollHeight||1);
+    var scaleW=innerW/baseW;
+    var scaleH=innerH/baseH;
     var base = IS_MOBILE
       ? ((window.innerHeight||0) >= (window.innerWidth||0) ? scaleW : scaleH)
       : Math.min(scaleW, scaleH);
     var s=Math.min(1, base) * (USER_SCALE>0?USER_SCALE:1);
-    var scaledW = (G.scrollWidth||1) * s;
-    var scaledH = (G.scrollHeight||1) * s;
+    var scaledW = baseW * s;
+    var scaledH = baseH * s;
     var padX = IS_MOBILE ? Math.max(0, Math.floor((cw - scaledW) / 2)) : 10;
     var padY = IS_MOBILE ? Math.max(0, Math.floor((ch - scaledH) / 2)) : 10;
     if(IS_MOBILE){
@@ -600,6 +604,8 @@ function buildStaticTvHtml(h: Hallway): string {
       C.style.display = 'block';
       C.style.alignItems = '';
       C.style.justifyContent = '';
+      G.style.width = baseW + 'px';
+      G.style.height = baseH + 'px';
       G.style.position = 'absolute';
       G.style.left = '50%';
       G.style.top = '50%';
@@ -613,6 +619,8 @@ function buildStaticTvHtml(h: Hallway): string {
       G.style.position = 'relative';
       G.style.left = '';
       G.style.top = '';
+      G.style.width = '';
+      G.style.height = '';
       G.style.transform='translate('+padX+'px,'+padY+'px) scale('+s+')';
       G.style.transformOrigin = 'center top';
     }
