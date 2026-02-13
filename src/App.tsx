@@ -595,8 +595,13 @@ function buildStaticTvHtml(h: Hallway): string {
     var scaledH = (G.scrollHeight||1) * s;
     var padX = IS_MOBILE ? Math.max(0, Math.floor((cw - scaledW) / 2)) : 10;
     var padY = IS_MOBILE ? Math.max(0, Math.floor((ch - scaledH) / 2)) : 10;
+    if(IS_MOBILE){
+      C.style.alignItems = 'flex-start';
+    } else {
+      C.style.alignItems = 'center';
+    }
     G.style.transform='translate('+padX+'px,'+padY+'px) scale('+s+')';
-    G.style.transformOrigin='center top';
+    G.style.transformOrigin = IS_MOBILE ? 'top left' : 'center top';
     if(H && !headerInside){
       H.style.width = scaledW + 'px';
       H.style.marginLeft = padX + 'px';
