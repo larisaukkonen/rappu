@@ -564,6 +564,14 @@ function buildStaticTvHtml(h: Hallway): string {
   var NEWS_LIMIT = ${newsLimit ?? "null"};
   var API_ORIGIN = ${JSON.stringify(apiOrigin)};
   var IS_PORTRAIT = ${orientation === "portrait" ? "true" : "false"};
+  var IS_MOBILE = (function(){
+    try {
+      var ua = navigator.userAgent || "";
+      if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(ua)) return true;
+      var w = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+      return w > 0 && w <= 768;
+    } catch { return false; }
+  })();
   function fit(){
     var C=document.getElementById('container');
     var H = document.getElementById('header');
@@ -579,7 +587,10 @@ function buildStaticTvHtml(h: Hallway): string {
     var innerH=Math.max(0, availH-20);
     var scaleW=innerW/(G.scrollWidth||1);
     var scaleH=innerH/(G.scrollHeight||1);
-    var s=Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
+    var base = IS_MOBILE
+      ? ((window.innerHeight||0) >= (window.innerWidth||0) ? scaleW : scaleH)
+      : Math.min(scaleW, scaleH);
+    var s=Math.min(1, base) * (USER_SCALE>0?USER_SCALE:1);
     G.style.transform='translate(10px,10px) scale('+s+')';
     G.style.transformOrigin='center top';
     if(H && !headerInside){
