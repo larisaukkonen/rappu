@@ -2299,6 +2299,21 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <Button type="button" onClick={() => copySavedUrl(savedUrlDialogInputRef.current)}>Kopioi</Button>
               <Button type="button" onClick={() => savedHtml && downloadStaticHtmlFile(savedFilename || "ruutu.html", savedHtml)} disabled={!savedHtml}>Lataa</Button>
             </div>
+            {savedUrl && (
+              <div className="flex items-center gap-3 pt-2">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(savedUrl)}`}
+                  alt="QR-koodi"
+                  width={120}
+                  height={120}
+                  className="rounded border bg-white"
+                  loading="lazy"
+                />
+                <div className="text-xs opacity-70">
+                  Skannaa QR-koodi puhelimella avataksesi näkymän.
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" onClick={() => setShowSavedDialog(false)}>Sulje</Button>
