@@ -591,12 +591,15 @@ function buildStaticTvHtml(h: Hallway): string {
       ? ((window.innerHeight||0) >= (window.innerWidth||0) ? scaleW : scaleH)
       : Math.min(scaleW, scaleH);
     var s=Math.min(1, base) * (USER_SCALE>0?USER_SCALE:1);
-    G.style.transform='translate(10px,10px) scale('+s+')';
+    var scaledW = (G.scrollWidth||1) * s;
+    var scaledH = (G.scrollHeight||1) * s;
+    var padX = IS_MOBILE ? Math.max(0, Math.floor((cw - scaledW) / 2)) : 10;
+    var padY = IS_MOBILE ? Math.max(0, Math.floor((ch - scaledH) / 2)) : 10;
+    G.style.transform='translate('+padX+'px,'+padY+'px) scale('+s+')';
     G.style.transformOrigin='center top';
     if(H && !headerInside){
-      var scaledW = (G.scrollWidth||1) * s;
       H.style.width = scaledW + 'px';
-      H.style.marginLeft = '10px';
+      H.style.marginLeft = padX + 'px';
       H.style.marginRight = '0px';
     }
   }
