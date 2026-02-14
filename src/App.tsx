@@ -826,13 +826,9 @@ function buildStaticTvHtml(h: Hallway): string {
         bindImages();
       }
       function measure(){
-        var measureRoot = document.createElement('div');
-        measureRoot.style.cssText = 'position:absolute;left:-99999px;top:-99999px;visibility:hidden;height:0;overflow:hidden;white-space:nowrap;';
-        measureRoot.innerHTML = baseHtml;
-        document.body.appendChild(measureRoot);
-        var lastBase = measureRoot.children[baseCount - 1];
+        var children = track.children;
+        var lastBase = children[baseCount - 1];
         var baseWidth = lastBase ? (lastBase.offsetLeft + lastBase.offsetWidth) : 0;
-        document.body.removeChild(measureRoot);
         if(!Number.isFinite(baseWidth) || baseWidth <= 0) return;
         var wrapWidth = logos.clientWidth;
         var nextRepeat = Math.max(1, Math.ceil(wrapWidth / baseWidth));
@@ -842,7 +838,6 @@ function buildStaticTvHtml(h: Hallway): string {
           scheduleMeasure();
           return;
         }
-        var children = track.children;
         var setCount = baseCount * nextRepeat;
         var first = children[0];
         var second = children[setCount];
