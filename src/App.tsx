@@ -590,19 +590,17 @@ function buildStaticTvHtml(h: Hallway): string {
     var availH=Math.max(0,ch-usedTop-usedBottom);
     var innerW=Math.max(0, cw-20);
     var innerH=Math.max(0, availH-20);
-    var baseW = (typeof BASE_W === 'number' && BASE_W > 0) ? BASE_W : (G.scrollWidth||1);
-    var baseH = (typeof BASE_H === 'number' && BASE_H > 0) ? BASE_H : (G.scrollHeight||1);
-    var scaleW=innerW/baseW;
-    var scaleH=innerH/baseH;
-    var base = IS_MOBILE
-      ? ((window.innerHeight||0) >= (window.innerWidth||0) ? scaleW : scaleH)
-      : Math.min(scaleW, scaleH);
-    var s=Math.min(1, base) * (USER_SCALE>0?USER_SCALE:1);
-    var scaledW = baseW * s;
-    var scaledH = baseH * s;
-    var padX = IS_MOBILE ? Math.max(0, Math.floor((cw - scaledW) / 2)) : 10;
-    var padY = IS_MOBILE ? Math.max(0, Math.floor((ch - scaledH) / 2)) : 10;
     if(IS_MOBILE){
+      var baseW = (typeof BASE_W === 'number' && BASE_W > 0) ? BASE_W : (G.scrollWidth||1);
+      var baseH = (typeof BASE_H === 'number' && BASE_H > 0) ? BASE_H : (G.scrollHeight||1);
+      var scaleW=innerW/baseW;
+      var scaleH=innerH/baseH;
+      var base = ((window.innerHeight||0) >= (window.innerWidth||0) ? scaleW : scaleH);
+      var s=Math.min(1, base) * (USER_SCALE>0?USER_SCALE:1);
+      var scaledW = baseW * s;
+      var scaledH = baseH * s;
+      var padX = Math.max(0, Math.floor((cw - scaledW) / 2));
+      var padY = Math.max(0, Math.floor((ch - scaledH) / 2));
       C.style.position = 'relative';
       C.style.display = 'block';
       C.style.alignItems = '';
@@ -614,7 +612,6 @@ function buildStaticTvHtml(h: Hallway): string {
       G.style.top = '50%';
       G.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
       G.style.transformOrigin = 'center center';
-      padX = 0; padY = 0;
     } else {
       C.style.position = 'relative';
       C.style.display = 'flex';
@@ -625,11 +622,19 @@ function buildStaticTvHtml(h: Hallway): string {
       G.style.top = '';
       G.style.width = '';
       G.style.height = '';
+      var scaleW = innerW/(G.scrollWidth||1);
+      var scaleH = innerH/(G.scrollHeight||1);
+      var s = Math.min(1, scaleW, scaleH) * (USER_SCALE>0?USER_SCALE:1);
+      var padX = 10;
+      var padY = 10;
       G.style.transform='translate('+padX+'px,'+padY+'px) scale('+s+')';
       G.style.transformOrigin = 'center top';
     }
     if(H && !headerInside){
-      H.style.width = scaledW + 'px';
+      var headerScaleW = IS_MOBILE
+        ? ((typeof BASE_W === 'number' && BASE_W > 0) ? BASE_W : (G.scrollWidth||1)) * (USER_SCALE>0?USER_SCALE:1)
+        : (G.scrollWidth||1) * s;
+      H.style.width = headerScaleW + 'px';
       H.style.marginLeft = padX + 'px';
       H.style.marginRight = '0px';
     }
