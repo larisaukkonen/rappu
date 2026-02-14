@@ -1170,10 +1170,11 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
   const uploadLogoFile = async (file: File, signal?: AbortSignal) => {
     const dataUrl = await readFileAsDataUrl(file);
     const serial = (hallway.serial || "").trim();
+    const uploadName = serial ? `${serial}_${file.name}` : file.name;
     const res = await fetch("/api/logo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl, filename: file.name, serial }),
+      body: JSON.stringify({ dataUrl, filename: uploadName, serial }),
       signal,
     });
     if (!res.ok) throw new Error(await res.text());
@@ -1212,6 +1213,13 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
 
   const handleLogoFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const serial = (hallway.serial || "").trim();
+    if (!serial) {
+      setLogoError("Syötä laitteen sarjanumero ennen logojen latausta.");
+      setLogoUploadItems([]);
+      clearLogoInput();
+      return;
+    }
     const existingCount = (hallway.logos || []).length;
     if (existingCount + files.length > 20) {
       setLogoError("Enintään 20 logoa sallittu.");
@@ -1239,7 +1247,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
           const cleanName = item.file.name.replace(/\.[^.]+$/, "");
           const newId = uid();
           logoUploadBatchIdsRef.current.push(newId);
-          setHallway((h) => ({ ...h, logos: [...(h.logos || []), { id: newId, url: uploaded.url, name: uploaded.name || cleanName }] }));
+          setHallway((h) => ({ ...h, logos: [...(h.logos || []), { id: newId, url: uploaded.url, name: cleanName }] }));
           setLogoUploadItems((prev) =>
             prev.map((entry) => (entry.id === item.id ? { ...entry, status: "done" } : entry))
           );
@@ -1570,15 +1578,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               )}
             </div>
           </CardHeader>
-          <div className="px-6 pb-2 text-sm opacity-70">
-            {activeTab === "hallinta" && "Määritä laitteen asetukset ja tallennusväli. Muutokset näkyvät oikealla esikatselussa."}
-            {activeTab === "otsikko" && "Muokkaa rakennuksen ja käytävän otsikkoalueen tekstejä sekä zoomia."}
-            {activeTab === "asunnot" && "Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa."}
-            {activeTab === "saa" && "Määritä ruudulla näkyvä sää paikkakunnan mukaan. Voit käyttää myös automaattista tai manuaalista aikaa ja päivämäärää."}
-            {activeTab === "info" && "Jos haluat tiedottaa yleisölle jotain, voit tehdä sen ottamalla infoalue käyttöön ja syöttämällä tekstiä ja antamalla sille haluamasi tyylit."}
-            {activeTab === "uutiset" && "Näytä RSS-syötteestä uutiset ruudun oikeassa laidassa sään alapuolella. Määritä syötteen osoite ja halutessasi näytettävien uutisten määrä."}
-            {activeTab === "mainokset" && "Lisää logot, järjestä ne vetämällä ja määritä näkyvien logoiden määrä."}
-          </div>
           <CardContent>
             {activeTab === "hallinta" && (
               <>
