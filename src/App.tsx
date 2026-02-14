@@ -390,7 +390,7 @@ function buildStaticTvHtml(h: Hallway): string {
   const css = `
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}a{color:inherit}
 #container{position:relative;height:100vh;width:100vw;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-#scale-root{max-width:none;width:${baseW}px}
+#scale-root{max-width:100%}
 #header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0 20px;margin-bottom:48px;max-width:100%}
 #clock{max-width:100%}
 #brand{background:transparent}
@@ -566,9 +566,7 @@ function buildStaticTvHtml(h: Hallway): string {
   var IS_MOBILE = (function(){
     try {
       var ua = navigator.userAgent || "";
-      if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(ua)) return true;
-      var w = Math.min(window.innerWidth || 0, window.innerHeight || 0);
-      return w > 0 && w <= 768;
+      return /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(ua);
     } catch { return false; }
   })();
   function fit(){
@@ -618,6 +616,7 @@ function buildStaticTvHtml(h: Hallway): string {
       G.style.transformOrigin = 'center center';
       padX = 0; padY = 0;
     } else {
+      C.style.position = 'relative';
       C.style.display = 'flex';
       C.style.alignItems = 'center';
       C.style.justifyContent = 'flex-start';
