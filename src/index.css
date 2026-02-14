@@ -12,9 +12,9 @@ html, body {
 
 /* Slate editor + preview Info content styles */
 .slate-editable h1 {
-  font-size: 250%;
+  font-size: 200%;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.1;
   margin: 0.4em 0 0.3em;
 }
 .info-content h1 {
@@ -24,9 +24,9 @@ html, body {
   margin: 0.4em 0 0.3em;
 }
 .slate-editable h2 {
-  font-size: 180%;
+  font-size: 150%;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.1;
   margin: 0.4em 0 0.2em;
 }
 .info-content h2 {

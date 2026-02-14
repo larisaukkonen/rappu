@@ -76,7 +76,6 @@ export type Hallway = {
   // Logos
   logos?: { id: string; url: string; name?: string }[];
   logosAnimate?: boolean;
-  logosLimit?: number;
   logosEnabled?: boolean;
   logosBgColor?: string;
   logosSpeed?: number;
@@ -124,7 +123,6 @@ const emptyHallway = (partial?: Partial<Hallway>): Hallway => ({
   newsTitlePx: typeof partial?.newsTitlePx === "number" ? partial?.newsTitlePx : 36,
   logos: partial?.logos || [],
   logosAnimate: partial?.logosAnimate ?? false,
-  logosLimit: partial?.logosLimit,
   logosEnabled: partial?.logosEnabled ?? false,
   logosBgColor: partial?.logosBgColor || "",
   logosSpeed: typeof partial?.logosSpeed === "number" ? partial?.logosSpeed : 20,
@@ -363,8 +361,7 @@ function buildStaticTvHtml(h: Hallway): string {
   const contentHeight = orientation === "portrait" ? 1920 : 1080;
 
   const logosAll = (h.logos || []).filter((l) => l && l.url);
-  const logosLimit = typeof h.logosLimit === "number" && h.logosLimit > 0 ? Math.floor(h.logosLimit) : null;
-  const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
+  const logos = logosAll;
 
   const mainScale = typeof h.mainScale === "number" && isFinite(h.mainScale) ? h.mainScale : 1;
   const headerScale = typeof h.headerScale === "number" && isFinite(h.headerScale) ? h.headerScale : 1;
@@ -1519,43 +1516,36 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               {activeTab === 'hallinta' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Settings className="h-5 w-5"/>Asukasnäyttö - Asetukset</CardTitle>
-                  <p className="text-sm opacity-70">Määritä laitteen asetukset ja tallennusväli. Muutokset näkyvät oikealla esikatselussa.</p>
                 </>
               )}
               {activeTab === 'otsikko' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Type className="h-5 w-5"/>Asukasnäyttö - Otsikko</CardTitle>
-                  <p className="text-sm opacity-70">Muokkaa rakennuksen ja käytävän otsikkoalueen tekstejä sekä zoomia.</p>
                 </>
               )}
               {activeTab === 'asunnot' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Building className="h-5 w-5"/>Asukasnäyttö - Asunnot</CardTitle>
-                  <p className="text-sm opacity-70">Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa.</p>
                 </>
               )}
               {activeTab === 'saa' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><CloudSun className="h-5 w-5"/>Asukasnäyttö - Sää + aika</CardTitle>
-                  <p className="text-sm opacity-70">Määritä ruudulla näkyvä sää paikkakunnan mukaan. Voit käyttää myös automaattista tai manuaalista aikaa ja päivämäärää.</p>
                 </>
               )}
               {activeTab === 'info' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Info className="h-5 w-5"/>Asukasnäyttö - Info</CardTitle>
-                  <p className="text-sm opacity-70">Jos haluat tiedottaa yleisölle jotain, voit tehdä sen ottamalla infoalue käyttöön ja syöttämällä tekstiä ja antamalla sille haluamasi tyylit.</p>
                 </>
               )}
               {activeTab === 'uutiset' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Newspaper className="h-5 w-5"/>Asukasnäyttö - Uutiset</CardTitle>
-                  <p className="text-sm opacity-70">Näytä RSS-syötteestä uutiset ruudun oikeassa laidassa sään alapuolella. Määritä syötteen osoite ja halutessasi näytettävien uutisten määrä.</p>
                 </>
               )}
               {activeTab === 'mainokset' && (
                 <>
                   <CardTitle className="text-xl flex items-center gap-2"><Megaphone className="h-5 w-5"/>Asukasnäyttö - Mainokset</CardTitle>
-                  <p className="text-sm opacity-70">Lisää logot, järjestä ne vetämällä ja määritä näkyvien logoiden määrä.</p>
                 </>
               )}
             </div>
@@ -1580,6 +1570,15 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               )}
             </div>
           </CardHeader>
+          <div className="px-6 pb-2 text-sm opacity-70">
+            {activeTab === "hallinta" && "Määritä laitteen asetukset ja tallennusväli. Muutokset näkyvät oikealla esikatselussa."}
+            {activeTab === "otsikko" && "Muokkaa rakennuksen ja käytävän otsikkoalueen tekstejä sekä zoomia."}
+            {activeTab === "asunnot" && "Muokkaa kerroksia, asuntoja ja asukkaiden sukunimiä. Muutokset näkyvät oikealla esikatselussa."}
+            {activeTab === "saa" && "Määritä ruudulla näkyvä sää paikkakunnan mukaan. Voit käyttää myös automaattista tai manuaalista aikaa ja päivämäärää."}
+            {activeTab === "info" && "Jos haluat tiedottaa yleisölle jotain, voit tehdä sen ottamalla infoalue käyttöön ja syöttämällä tekstiä ja antamalla sille haluamasi tyylit."}
+            {activeTab === "uutiset" && "Näytä RSS-syötteestä uutiset ruudun oikeassa laidassa sään alapuolella. Määritä syötteen osoite ja halutessasi näytettävien uutisten määrä."}
+            {activeTab === "mainokset" && "Lisää logot, järjestä ne vetämällä ja määritä näkyvien logoiden määrä."}
+          </div>
           <CardContent>
             {activeTab === "hallinta" && (
               <>
@@ -1616,7 +1615,7 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                 </div>
 
                 <div className="mb-4">
-                  <Label htmlFor="orientation">Suunta</Label>
+                  <Label htmlFor="orientation" className="block mb-1">Suunta</Label>
                   <select
                     id="orientation"
                     value={hallway.orientation || "landscape"}
@@ -1930,24 +1929,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     onCheckedChange={(v) => setHallway((h) => ({ ...h, logosEnabled: v }))}
                   />
                   <Label htmlFor="logos-enabled">Käytössä</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-full">
-                    <Label>{"Logoja n\u00e4kyviss\u00e4, (1-20)"}</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      value={hallway.logosLimit ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value.trim();
-                        const num = v ? Number(v) : NaN;
-                        setHallway((h) => ({ ...h, logosLimit: Number.isFinite(num) ? Math.min(20, Math.max(1, num)) : undefined }));
-                      }}
-                      placeholder="N&auml;yt&auml; kaikki"
-                      className="w-full"
-                      disabled={!hallway.logosEnabled}
-                    />
-                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-full">
@@ -2470,8 +2451,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
     () => (hallway.logos || []).filter((l): l is { id: string; url: string; name?: string } => !!(l && l.url)),
     [hallway.logos]
   );
-  const logosLimit = typeof hallway.logosLimit === "number" && hallway.logosLimit > 0 ? Math.floor(hallway.logosLimit) : null;
-  const logos = logosLimit ? logosAll.slice(0, logosLimit) : logosAll;
+  const logos = logosAll;
   const shouldAnimate = !!hallway.logosAnimate && !!hallway.logosEnabled;
   const newsEnabled = !!hallway.newsEnabled && (hallway.newsRssUrl || "").trim().length > 0;
   const infoPinBottom = !!hallway.infoPinBottom;
