@@ -419,7 +419,7 @@ function buildStaticTvHtml(h: Hallway): string {
 .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;min-height:0;padding:8px}
 .col-main{overflow:hidden}
 .col > .vcenter{margin:auto 0}
-.inner-pad{padding-left:0;padding-right:0}
+.inner-pad{padding-left:10%;padding-right:10%}
 .inner-pad-info{display:flex;flex-direction:column;height:100%;flex:1;padding-left:10%;padding-right:10%}
 .inner-pad-info.pin-bottom{padding-bottom:10px}
 .inner-pad-info.pin-bottom #news + .info-content{margin-top:0}
@@ -1460,37 +1460,6 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
               <div className="w-14 text-center tabular-nums">{Math.round(((hallway.scale ?? 1) * 100))}%</div>
               <Button type="button" variant="secondary" onClick={() => setHallway((h) => ({ ...h, scale: Math.min(2, Math.round((((h.scale ?? 1) + 0.05) * 100)) / 100) }))}>+</Button>
             </div>
-            <button
-              type="button"
-              aria-label="Vaihda suunta"
-              title="Vaihda suunta"
-              onClick={() =>
-                setHallway((h) => ({ ...h, orientation: (h.orientation || "landscape") === "portrait" ? "landscape" : "portrait" }))
-              }
-              className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border bg-white text-black"
-            >
-              {(hallway.orientation || "landscape") === "portrait" ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="currentColor" d="M10 16h4c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1v-1a2 2 0 1 0-4 0v1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1m.8-6c0-.66.54-1.2 1.2-1.2s1.2.54 1.2 1.2v1h-2.4zM17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2m0 18H7V5h10z"/>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="currentColor" d="M21 5H3c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m-2 12H5V7h14zm-9-1h4c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1v-1a2 2 0 1 0-4 0v1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1m.8-6c0-.66.54-1.2 1.2-1.2s1.2.54 1.2 1.2v1h-2.4z"/>
-                </svg>
-              )}
-            </button>
-            <div className="hidden sm:flex items-center gap-2">
-              <Label htmlFor="orientation" className="text-sm font-normal">Suunta</Label>
-              <select
-                id="orientation"
-                value={hallway.orientation || "landscape"}
-                onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))}
-                className="h-9 px-2 rounded-md border bg-white text-black"
-              >
-                <option value="portrait">Pysty</option>
-                <option value="landscape">Vaaka</option>
-              </select>
-            </div>
             <label className="hidden sm:flex items-center gap-2 text-sm">
               <span>Esikatselu</span>
               <button
@@ -1644,6 +1613,19 @@ export default function App({ hallwayId = "demo-hallway" }: { hallwayId?: string
                     className="w-48"
                   />
                   <div className="text-xs opacity-70 mt-1">Minuutteina (1-100). Määrittää kuinka usein ruutu tarkistaa uudet muutokset.</div>
+                </div>
+
+                <div className="mb-4">
+                  <Label htmlFor="orientation">Suunta</Label>
+                  <select
+                    id="orientation"
+                    value={hallway.orientation || "landscape"}
+                    onChange={(e) => setHallway((h) => ({ ...h, orientation: e.target.value as Orientation }))}
+                    className="h-9 px-2 rounded-md border bg-white text-black w-48"
+                  >
+                    <option value="portrait">Pysty</option>
+                    <option value="landscape">Vaaka</option>
+                  </select>
                 </div>
 
                 <div className="mb-4">
@@ -2681,7 +2663,7 @@ function HallwayTvPreview({ hallway }: { hallway: Hallway }) {
             <div className={cn(((hallway.infoEnabled && (hallway.infoHtml || "").trim()) || newsEnabled) ? "flex-1" : "w-full", "min-w-0 p-2 h-full flex overflow-hidden min-h-0") }>
               <div
                 className={cn("vcenter w-full", columns.length > 1 ? "flex gap-8" : "")}
-                style={{ "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
+                style={{ paddingLeft: "10%", paddingRight: "10%", "--preview-text-scale": userScale * mainScale } as React.CSSProperties}
               >
                 {columns.map((column, ci) => (
                   <div key={`col-${ci}`} className="min-w-0 flex-1">
