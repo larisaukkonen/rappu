@@ -818,6 +818,7 @@ function buildStaticTvHtml(h: Hallway): string {
           logosAnimMeta = { span: span, speed: speed };
         }
       }
+      var LOGOS_REPEAT_CAP = 6;
       function buildTrack(repeat){
         var tiledHtml = '';
         for(var i=0;i<repeat;i++){ tiledHtml += baseHtml; }
@@ -829,9 +830,10 @@ function buildStaticTvHtml(h: Hallway): string {
         var children = track.children;
         var lastBase = children[baseCount - 1];
         var baseWidth = lastBase ? (lastBase.offsetLeft + lastBase.offsetWidth) : 0;
-        if(!Number.isFinite(baseWidth) || baseWidth <= 0) return;
+        if(!Number.isFinite(baseWidth) || baseWidth < 20) return;
         var wrapWidth = logos.clientWidth;
         var nextRepeat = Math.max(1, Math.ceil(wrapWidth / baseWidth));
+        if(nextRepeat > LOGOS_REPEAT_CAP) nextRepeat = LOGOS_REPEAT_CAP;
         if(logosState.repeat !== nextRepeat){
           logosState.repeat = nextRepeat;
           buildTrack(nextRepeat);
