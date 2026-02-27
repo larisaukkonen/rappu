@@ -1,4 +1,15 @@
 // api/rss.ts
+import dns from "node:dns";
+import { Agent, fetch as undiciFetch } from "undici";
+
+const ipv4Agent = new Agent({
+  connect: {
+    lookup: (hostname, opts, cb) => {
+      dns.lookup(hostname, { ...opts, family: 4 }, cb);
+    },
+  },
+});
+
 export default async function handler(req: any, res: any) {
   const setCors = () => {
     res.removeHeader?.("X-Frame-Options");
@@ -18,12 +29,20 @@ export default async function handler(req: any, res: any) {
   if (!/^https?:\/\//i.test(url)) return res.status(400).send("Invalid url");
 
   try {
-    const upstream = await fetch(url, { headers: { "User-Agent": "rappu-rss-proxy" } });
+    const upstream = await undiciFetch(url, {
+      headers: { "User-Agent": "rappu-rss-proxy" },
+      dispatcher: ipv4Agent,
+    });
     if (!upstream.ok) return res.status(upstream.status).send("Upstream error");
     const text = await upstream.text();
     res.setHeader("Content-Type", upstream.headers.get("content-type") || "application/rss+xml; charset=utf-8");
     return res.status(200).send(text);
   } catch (e: any) {
-    return res.status(500).send(`Proxy failed: ${e?.message || String(e)}`);
+    const cause = e?.cause;
+    const causeMsg =
+      cause && (cause.code || cause.message)
+        ? ` (cause: ${cause.code || cause.message})`
+        : "";
+    return res.status(500).send(`Proxy failed: ${e?.message || String(e)}${causeMsg}`);
   }
 }
